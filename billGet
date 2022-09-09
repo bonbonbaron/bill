@@ -1,0 +1,10 @@
+#!/bin/bash
+curl $(cat billDb/congress117Bills | jq '.packages[] | .title, .packageLink' | sed -E -n 'N; s/.*foreign medical school.*\n(.*)/\1/ip' | sed 's/"//g')?api_key=$(cat key)
+
+# Get bill summary
+billSummary=$(curl -X 'GET' "https://api.govinfo.gov/packages/BILLS-117hr8706ih/summary?api_key=$(cat key)")
+# Get full bill (in text format)
+bill=$(curl -X GET "$(echo "$billSummary" | sed -E -n 's/.*"txtLink": "(.*)",/\1/p')"?api_key=$(cat key))
+# Remove HTML tags from bill
+bill=$(echo "$bill" | sed -e 's/\&lt;.*\&gt;//g; s/<[^>]*>//g')
+echo -e $bill
