@@ -1,0 +1,79 @@
+#!/bin/bash
+
+function getVal {
+  grep $1 $2 | awk '{print $2}' | tr -d '",'
+}
+
+function getVals {
+  IFS='
+  '
+  echo "$(getVal $1 $2)"
+}
+
+# Force bill directory to exist.
+REPO=$(readlink -f $(dirname $0))
+# Today's date in URL-acceptable format
+DATE=$(date +%Y-%m-%d)
+BDIR=$REPO/db/bills/$DATE
+PKG_DIR=$BDIR/pkgs/
+PKG_URL_DIR=$PKG_DIR/urls
+# Key
+KEY="api_key=$(cat ${HOME}/.congress/CONGRESS_KEY)"
+
+# Create directory structure.
+if [ ! -d $PKG_URL_DIR ]; then
+  mkdir -p $PKG_URL_DIR
+fi
+
+# Get this congress's first page of 100 bill summaries. (Time format in URL is yyyy-mm-dd'T'HH:mm:ss'Z'.)
+todays_bill_activity=$(curl -s -X 'GET' "https://api.govinfo.gov/collections/BILLS/${DATE}T00%3A00%3A00Z?pageSize=100&offsetMark=*&congress=$1&$KEY")
+
+# Store the first page of results in database.
+counter=0
+echo $todays_bill_activity | jq '.' > ${PKG_URL_DIR}/${counter}-$DATE
+
+# If there are anymore pages beyond the first, retrieve and store them in the databse as well.
+nextPage=$(echo "$todays_bill_activity" | jq '.nextPage' | sed 's/"//g')
+while [ ! ${nextPage} = null ]; do
+  ((counter += 1))
+  echo "nextPage = ${nextPage}"
+  todays_bill_activity=$(curl -s -X 'GET' "${nextPage}&$KEY")
+  echo $todays_bill_activity | jq '.' >> ${PKG_URL_DIR}/${counter}-$DATE
+  nextPage=$(echo $todays_bill_activity | jq '.nextPage' | sed 's/"//g')
+done
+
+# For all bill activities today...
+for f in $(ls ${PKG_URL_DIR}); do
+  # Make an array of IDs
+  pkgIds=($(getVals packageId "${PKG_URL_DIR}/$f"))
+  # Make a corresponding array of URLs
+  pkgUrls=($(getVals packageLink "${PKG_URL_DIR}/$f"))
+  # Make sure we have the same number of package URLs as we do package IDs. They need to correspond perfectly.
+  if [ ${#pkgIds[*]} -ne ${#pkgUrls[*]} ]; then
+    echo "There's supposed to be the same number of package IDs as package URLs in $f. Is it corrupted? Exitting..."
+    exit
+  fi
+  # For each ID-URL mapping in the current batch...
+  counter=0
+  maxCounter=${#pkgIds[*]}
+  while [ $counter -lt $maxCounter ]; do
+    id=${pkgIds[$counter]}
+    pkgUrl=${pkgUrls[$counter]}
+    # I append the counter to the package ID *just in case* there's multiple activity on the same document.
+    # Don't re-download pre-existing text docs.
+    fmtCounter=$(printf '%03d' $counter)
+    pkgDoc=$PKG_DIR/$fmtCounter-${pkgIds[$counter]}
+    # Only curl the package if we haven't done so for this one yet.
+    if [ ! -e $pkgDoc ]; then
+      curl -s "${pkgUrl}?$KEY" > $pkgDoc
+      txtUrl=$(getVal txtLink $pkgDoc)
+      txtDoc=$BDIR/txt-$fmtCounter-$id
+      # Don't re-download pre-existing text docs.
+      if [ ! -e $txtDoc ]; then
+        curl -s $txtUrl?$KEY > "$txtDoc"
+        echo $txtDoc
+      fi
+    fi
+    ((counter++))
+  done
+done

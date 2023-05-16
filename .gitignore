@@ -2,3 +2,4 @@ bills/
 bills/**/*
 db/**/*
 db/
+**/*.sw*
