@@ -6,7 +6,7 @@ if [ $# -eq 1 -a $1 -gt 0 ]; then
   output=$(curl -X 'GET' "https://api.govinfo.gov/collections/BILLS/1700-01-28T20%3A18%3A10Z?pageSize=100&offsetMark=*&congress=$1&api_key=$(cat key)")
   echo $output | jq > db/congress$1Bills
   # Get the next page of up to 100 bill summaries if it exists.
-  nextPage=$(cat out | jq '.nextPage' | sed 's/"//g')
+  nextPage=$(echo "$output" | jq '.nextPage' | sed 's/"//g')
   while [ ! ${nextPage} = null ]; do
     echo "nextPage = ${nextPage}"
     output=$(curl -X 'GET' "${nextPage}&api_key=$(cat key)")

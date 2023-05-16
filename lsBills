@@ -19,15 +19,25 @@ IFS='
 echo "Congress # is $congressNum, key-phrase is \"${keyPhrase}\"."
 results=($(cat db/congress${congressNum}Bills | jq '.packages[] | .title, .packageLink, .packageId' | grep -i -A 2 ${keyPhrase} | sed 's/"//g' | sed '/--/d'))
 
+echo ${results[@]}
+echo ${#results[@]} 
+exit
+
 i=0
 while [ $i -lt ${#results} ]; do
   # $i is the "--" separator output by grep. Hence the increment-by-4.
   currTitle=${results[$(( $i + 0 ))]}
   currLink="${results[$(( $i + 1 ))]}?api_key=$(cat key)"
   currPkgId=${results[$(( $i + 2 ))]}
+  echo "title: $currTitle"
+  echo "link: $currLink"
+  echo "currPkgId: $currPkgId"
+  echo "$i out of ${#results}"
+  (( i += 3 ))
+  continue
   echo "Downloading $currLink..."
   billSummary=$(curl $currLink)
   billLink=$(echo $billSummary | jq '.download.txtLink' | sed 's/"//g')
-  curl "${billLink}?api_key=$(cat key)" > bills/$currPkgId
+  curl "${billLink}?api_key=$(cat key)" > ./bills/$currPkgId
   (( i += 3 ))
 done

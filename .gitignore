@@ -1,0 +1,4 @@
+bills/
+bills/**/*
+db/**/*
+db/
