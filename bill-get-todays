@@ -61,17 +61,23 @@ for f in $(ls ${PKG_URL_DIR}); do
     pkgUrl=${pkgUrls[$counter]}
     # I append the counter to the package ID *just in case* there's multiple activity on the same document.
     # Don't re-download pre-existing text docs.
-    fmtCounter=$(printf '%03d' $counter)
-    pkgDoc=$PKG_DIR/$fmtCounter-${pkgIds[$counter]}
+    formattedCounter=$(printf '%03d' $counter)
+    pkgDoc=$PKG_DIR/$formattedCounter-${pkgIds[$counter]}
     # Only curl the package if we haven't done so for this one yet.
     if [ ! -e $pkgDoc ]; then
       curl -s "${pkgUrl}?$KEY" > $pkgDoc
       txtUrl=$(getVal txtLink $pkgDoc)
-      txtDoc=$BDIR/txt-$fmtCounter-$id
+      txtDoc=$BDIR/txt-$formattedCounter-$id
       # Don't re-download pre-existing text docs.
       if [ ! -e $txtDoc ]; then
         curl -s $txtUrl?$KEY > "$txtDoc"
         echo $txtDoc
+      fi
+      if [ $? -eq 0 -a -e $txtDoc ]; then
+        # Insert a user into the 'users' table 
+        sqlite3 "$database_file" "INSERT INTO users (name) VALUES ('John Doe');" 
+        # Query all data from the 'users' table and display it 
+        sqlite3 "$database_file" "SELECT bill-get-todays db gpt-out new.db secs select select bill-get-todays db gpt-out new.db secs select select bill-get-todays db gpt-out new.db secs select select bill-get-todays db gpt-out new.db secs select select * from amts todo from amts todo from amts todo from amts todo FROM users;" 
       fi
     fi
     ((counter++))

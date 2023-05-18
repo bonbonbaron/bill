@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Database 
+dbFile="${HOME}/new.db" 
+
+# Create a table called 'users' with two columns: 'id' and 'name' 
+sqlite3 "$dbFile" "CREATE TABLE IF NOT EXISTS bill (id INTEGER PRIMARY KEY, name TEXT UNIQUE, desc TEXT, nUpdates INTEGER, nPages INTEGER, stageId INTEGER, filepath TEXT);" 
+
+# Congressmen
+sqlite3 "$dbFile" "DROP TABLE IF EXISTS congressman" 
+sqlite3 "$dbFile" "CREATE TABLE IF NOT EXISTS congressman (bioguide TEXT PRIMARY KEY, lname TEXT, fname TEXT, party TEXT, stateId INTEGER);" 
+
+# States
+sqlite3 "$dbFile" "CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY, desc TEXT UNIQUE);" 
+sqlite3 "$dbFile" "insert into state (desc) values ('AL');"
+sqlite3 "$dbFile" "insert into state (desc) values ('AK');"
+sqlite3 "$dbFile" "insert into state (desc) values ('AZ');"
+sqlite3 "$dbFile" "insert into state (desc) values ('AR');"
+sqlite3 "$dbFile" "insert into state (desc) values ('CA');"
+sqlite3 "$dbFile" "insert into state (desc) values ('CO');"
+sqlite3 "$dbFile" "insert into state (desc) values ('CT');"
+sqlite3 "$dbFile" "insert into state (desc) values ('DE');"
+sqlite3 "$dbFile" "insert into state (desc) values ('FL');"
+sqlite3 "$dbFile" "insert into state (desc) values ('GA');"
+sqlite3 "$dbFile" "insert into state (desc) values ('HI');"
+sqlite3 "$dbFile" "insert into state (desc) values ('ID');"
+sqlite3 "$dbFile" "insert into state (desc) values ('IL');"
+sqlite3 "$dbFile" "insert into state (desc) values ('IN');"
+sqlite3 "$dbFile" "insert into state (desc) values ('IA');"
+sqlite3 "$dbFile" "insert into state (desc) values ('KS');"
+sqlite3 "$dbFile" "insert into state (desc) values ('KY');"
+sqlite3 "$dbFile" "insert into state (desc) values ('LA');"
+sqlite3 "$dbFile" "insert into state (desc) values ('ME');"
+sqlite3 "$dbFile" "insert into state (desc) values ('MD');"
+sqlite3 "$dbFile" "insert into state (desc) values ('MA');"
+sqlite3 "$dbFile" "insert into state (desc) values ('MI');"
+sqlite3 "$dbFile" "insert into state (desc) values ('MN');"
+sqlite3 "$dbFile" "insert into state (desc) values ('MS');"
+sqlite3 "$dbFile" "insert into state (desc) values ('MO');"
+sqlite3 "$dbFile" "insert into state (desc) values ('MT');"
+sqlite3 "$dbFile" "insert into state (desc) values ('NE');"
+sqlite3 "$dbFile" "insert into state (desc) values ('NV');"
+sqlite3 "$dbFile" "insert into state (desc) values ('NH');"
+sqlite3 "$dbFile" "insert into state (desc) values ('NJ');"
+sqlite3 "$dbFile" "insert into state (desc) values ('NM');"
+sqlite3 "$dbFile" "insert into state (desc) values ('NY');"
+sqlite3 "$dbFile" "insert into state (desc) values ('NC');"
+sqlite3 "$dbFile" "insert into state (desc) values ('ND');"
+sqlite3 "$dbFile" "insert into state (desc) values ('OH');"
+sqlite3 "$dbFile" "insert into state (desc) values ('OK');"
+sqlite3 "$dbFile" "insert into state (desc) values ('OR');"
+sqlite3 "$dbFile" "insert into state (desc) values ('PA');"
+sqlite3 "$dbFile" "insert into state (desc) values ('RI');"
+sqlite3 "$dbFile" "insert into state (desc) values ('SC');"
+sqlite3 "$dbFile" "insert into state (desc) values ('SD');"
+sqlite3 "$dbFile" "insert into state (desc) values ('TN');"
+sqlite3 "$dbFile" "insert into state (desc) values ('TX');"
+sqlite3 "$dbFile" "insert into state (desc) values ('UT');"
+sqlite3 "$dbFile" "insert into state (desc) values ('VT');"
+sqlite3 "$dbFile" "insert into state (desc) values ('VA');"
+sqlite3 "$dbFile" "insert into state (desc) values ('WA');"
+sqlite3 "$dbFile" "insert into state (desc) values ('WV');"
+sqlite3 "$dbFile" "insert into state (desc) values ('WI');"
+sqlite3 "$dbFile" "insert into state (desc) values ('WY');"
+
+# Stages
+# TODO: use this site:
+#       https://www.senate.gov/legislative/KeytoVersionsofPrintedLegislation.htm
+sqlite3 "$dbFile" "CREATE TABLE IF NOT EXISTS stage (id INTEGER PRIMARY KEY, desc TEXT UNIQUE);" 
+
+# Contributors
+sqlite3 "$dbFile" "CREATE TABLE IF NOT EXISTS contributor (id INTEGER PRIMARY KEY, billId INTEGER, congressmanId INTEGER);" 
+
+# Amounts
+sqlite3 "$dbFile" "CREATE TABLE IF NOT EXISTS gpt_amts (id INTEGER PRIMARY KEY, amt INTEGER, purpose TEXT, whom TEXT)";

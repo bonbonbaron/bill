@@ -1,3 +1,9 @@
-test against a large bill
-activity today
+\test against a large bill
+\activity today
+\set up sqllite database
+\design tables
+implement tables
+pre-populate tables as necessary
 
+pull from it in php page
+show on website
