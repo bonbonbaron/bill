@@ -1,0 +1,2 @@
+curl -X GET "https://api.congress.gov/v3/member/?api_key=$(cat ~/.congress/CONGRESS_KEY)&congress=118" > members
+a="https://api.congress.gov/v3/member?congress=118&offset=20&limit=20&format=json&api_key=aWMco5Ek7LN8HG8TDyQX4OuvUp0IGTF2UairXO82"
