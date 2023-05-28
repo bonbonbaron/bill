@@ -17,44 +17,60 @@ REPO=$(readlink -f $(dirname $0))
 # to debug, pick date in the past.
 DATE=2023-05-27
 BDIR=$REPO/db/bills/$DATE
-PKG_DIR=$BDIR/pkgs/
-PKG_URL_DIR=$PKG_DIR/urls
+PKG_URL_DIR=$REPO/.pkgs/
 DB=$REPO/.db
 # Key
 if [ ! -e $REPO/.env ]; then
   echo -e "You need to put a .env file into $SRC_DIR first. Populate that file like so:\n\nCONGRESS_KEY=<your API key>\n"
   exit 1
 fi
-source $REPO/.env
-KEY="api_key=$CONGRESS_KEY"
 
-# Create directory structure.
 if [ ! -d $PKG_URL_DIR ]; then
-  echo "creating pkg url directory"
   mkdir -p $PKG_URL_DIR
 fi
 
-BE_QUIET=-s
+source $REPO/.env
+KEY="api_key=$CONGRESS_KEY"
 
-# Get this congress's first page of 100 bill summaries. (Time format in URL is yyyy-mm-dd'T'HH:mm:ss'Z'.)
-todays_bill_activity=$(curl $BE_QUIET -X 'GET' "https://api.govinfo.gov/collections/BILLS/${DATE}T00%3A00%3A00Z?pageSize=100&offsetMark=*&congress=$1&$KEY")
+BE_QUIET=-s
+TMP=$REPO/.tmp
+
+rm -f $TMP
+touch $TMP
+
+function procBillPkg() {
+  echo "${@}" | jq '.' >> $TMP
+  CONGRESS=$(jq  '.congress'  $TMP| tr -d '"')
+  _type=$(jq '.billType'  $TMP | tr -d '"')
+  _billNumber=$(jq '.billNumber'  $TMP | tr -d '"')
+  name=$CONGRESS$_type$_billNumber  # CONGRESS number isn't technically part of "bill slug", but it'll keep it unique across congresses.
+  mkdir -p $REPO/db/$CONGRESS/$name/.pkg
+  mv $TMP $PKG_URL_DIR/url-pkg-$counter
+  ((counter += 1))
+}
+
 
 # Store the first page of results in database.
 counter=0
-echo $todays_bill_activity | jq '.' > ${PKG_URL_DIR}/${counter}-$DATE
+
+# Get this congress's first page of 100 bill summaries. (Time format in URL is yyyy-mm-dd'T'HH:mm:ss'Z'.)
+todays_bill_activity=$(curl $BE_QUIET -X 'GET' "https://api.govinfo.gov/collections/BILLS/${DATE}T00%3A00%3A00Z?pageSize=100&offsetMark=*&congress=$1&$KEY")
+procBillPkg $todays_bill_activity
+
 
 # If there are anymore pages beyond the first, retrieve and store them in the databse as well.
 nextPage=$(echo "$todays_bill_activity" | jq '.nextPage' | sed 's/"//g')
 while [ ! ${nextPage} = null ]; do
-  ((counter += 1))
   echo "nextPage = ${nextPage}"
   todays_bill_activity=$(curl $BE_QUIET -X 'GET' "${nextPage}&$KEY")
-  echo $todays_bill_activity | jq '.' >> ${PKG_URL_DIR}/${counter}-$DATE
+  procBillPkg $todays_bill_activity
   nextPage=$(echo $todays_bill_activity | jq '.nextPage' | sed 's/"//g')
 done
 
+rm -f $TMP
+
 # For all bill activities today...
-for f in $(ls ${PKG_URL_DIR}); do
+for f in $(ls $PKG_URL_DIR); do
   # Make an array of IDs
   pkgIds=($(getVals packageId "${PKG_URL_DIR}/$f"))
   # Make a corresponding array of URLs
@@ -73,71 +89,74 @@ for f in $(ls ${PKG_URL_DIR}); do
     # I append the counter to the package ID *just in case* there's multiple activity on the same document.
     # Don't re-download pre-existing text docs.
     formattedCounter=$(printf '%03d' $counter)
-    pkgDoc=$PKG_DIR/$formattedCounter-${pkgIds[$counter]}
     # Only curl the package if we haven't done so for this one yet.
-    if [ ! -e $pkgDoc ]; then
-      curl $BE_QUIET "${pkgUrl}?$KEY" > $pkgDoc
-      txtUrl=$(getVal txtLink $pkgDoc)
-      txtDoc=$BDIR/txt-$formattedCounter-$id
-      # Don't re-download pre-existing text docs.
-      if [ ! -e $txtDoc ]; then
-        curl $BE_QUIET $txtUrl?$KEY > "$txtDoc"
-        echo $txtDoc
+    curl $BE_QUIET "${pkgUrl}?$KEY" > $TMP
+    _billNumber=$(jq '.billNumber' $TMP | tr -d '"')
+    _type=$(jq '.billType' $TMP | tr -d '"')
+    CONGRESS=$(jq  '.congress' $TMP | tr -d '"')
+    name=$CONGRESS$_type$_billNumber  # CONGRESS number isn't technically part of "bill slug", but it'll keep it unique across congresses.
+    pkgPath="$REPO/db/$CONGRESS/$name/.pkg"
+    mkdir -p $pkgPath
+    pkgDoc=$pkgPath/pkg-$name
+    mv $TMP $pkgDoc
+    txtUrl=$(getVal txtLink $pkgDoc)
+    txtDoc=$pkgPath/../$name
+    curl $BE_QUIET $txtUrl?$KEY > "$txtDoc"
+    echo $txtDoc
+    if [ $? -eq 0 -a -e $txtDoc ]; then
+      # First, extract all the information you need about this bill.
+      # name TEXT <-- grep out the collecion code, its trailing hyphen, congress, and the billVersion
+
+      _type=$(jq '.billType' $pkgDoc | tr -d '"')
+      _version=$(jq '.billVersion' $pkgDoc | tr -d '"')
+      _collectionCode=$(jq '.collectionCode' $pkgDoc | tr -d '"')
+      _billNumber=$(jq '.billNumber' $pkgDoc | tr -d '"')
+      desc=$(jq '.shortTitle[0].title' $pkgDoc | tr -d '"')
+      if [ "$desc" = "null" ]; then
+        desc=$(jq '.title' $pkgDoc | tr -d '"')
       fi
-      if [ $? -eq 0 -a -e $txtDoc ]; then
-        # First, extract all the information you need about this bill.
-        # name TEXT <-- grep out the collecion code, its trailing hyphen, congress, and the billVersion
+      nUpdates=0 #TODO
+      nPages=$(jq '.pages' $pkgDoc | tr -d '"')
+      stage=$(jq '.billVersion' $pkgDoc | tr -d '"')
+      createdTm=$(jq '.dateIssued' $pkgDoc | date +%s | tr -d '"')
+      lastUpdatedTm=$(jq '.lastModified' $pkgDoc | date +%s | tr -d '"')
+      CONGRESS=$(jq  '.congress' $pkgDoc | tr -d '"')
+      name=$CONGRESS$_type$_billNumber  # CONGRESS number isn't technically part of "bill slug", but it'll keep it unique across congresses.
+      filepath="$REPO/db/$CONGRESS/$name"
 
-        _type=$(jq '.billType' $pkgDoc | tr -d '"')
-        _version=$(jq '.billVersion' $pkgDoc | tr -d '"')
-        _collectionCode=$(jq '.collectionCode' $pkgDoc | tr -d '"')
-        _billNumber=$(jq '.billNumber' $pkgDoc | tr -d '"')
-        desc=$(jq '.shortTitle[0].title' $pkgDoc | tr -d '"')
-        if [ "$desc" = "null" ]; then
-          desc=$(jq '.title' $pkgDoc | tr -d '"')
+      if [ ! -d $filepath ]; then
+        echo "creating filepath $filepath"
+        mkdir -p $filepath
+        if [ $? -ne 0 ]; then
+          echo "error making directory $filepath. Exitting..."
+          exit 1
         fi
-        nUpdates=0 #TODO
-        nPages=$(jq '.pages' $pkgDoc | tr -d '"')
-        stage=$(jq '.billVersion' $pkgDoc | tr -d '"')
-        createdTm=$(jq '.dateIssued' $pkgDoc | date +%s | tr -d '"')
-        lastUpdatedTm=$(jq '.lastModified' $pkgDoc | date +%s | tr -d '"')
-        CONGRESS=$(jq  '.congress' $pkgDoc | tr -d '"')
-        name=$CONGRESS$_type$_billNumber  # CONGRESS number isn't technically part of "bill slug", but it'll keep it unique across congresses.
-        filepath="$REPO/db/$CONGRESS/$name"
-
-        if [ ! -d $filepath ]; then
-          echo "creating filepath $filepath"
-          mkdir -p $filepath
-          if [ $? -ne 0 ]; then
-            echo "error making directory $filepath. Exitting..."
-            exit 1
-          fi
-        fi
-
-        execStr="
-        sqlite3 '$DB' 'INSERT INTO bill (
-          name,
-          desc,
-          nUpdates,
-          nPages,
-          stageId,
-          filepath,
-          createdTm,
-          lastUpdatedTm)
-        VALUES (
-          \"$name\",
-          \"$desc\",
-          $nUpdates,
-          $nPages,
-          (select id from stage where lower(symbol) = lower(\"$stage\")),
-          \"$filepath\",
-          $createdTm,
-          $lastUpdatedTm
-        );'"
-        echo $execStr  # good for debugging
-        eval $execStr
       fi
+
+      execStr="
+      sqlite3 '$DB' 'INSERT INTO bill (
+        name,
+        desc,
+        nUpdates,
+        nPages,
+        stageId,
+        filepath,
+        createdTm,
+        lastUpdatedTm)
+      VALUES (
+        \"$name\",
+        \"$desc\",
+        $nUpdates,
+        $nPages,
+        (select id from stage where lower(symbol) = lower(\"$stage\")),
+        \"$filepath\",
+        $createdTm,
+        $lastUpdatedTm
+      );'"
+      echo $execStr  # good for debugging
+      eval $execStr
     fi
     ((counter++))
   done
 done
+exit

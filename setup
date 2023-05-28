@@ -79,7 +79,7 @@ sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WI', 'Wisconsin');"
 sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WY', 'Wyoming');"
 
 
-# Bills: dynamic table mapping bills to bill filepaths, metadata, stage, and (site-searchable) description or title.
+# Bill: dynamic table mapping bills to bill filepaths, metadata, stage, and (site-searchable) description or title.
 # NOTE: lastUpdateTm is in seconds since epoch.
 sqlite3 "$DB" "DROP TABLE IF EXISTS bill" 
 sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS bill (id INTEGER PRIMARY KEY, name TEXT UNIQUE, desc TEXT, nUpdates INTEGER, nPages INTEGER, stageId INTEGER, createdTm INTEGER, lastUpdatedTm INTEGER, filepath TEXT);" 
@@ -132,10 +132,7 @@ for m in $(ls $MEMDIR/mem*); do
 done
 echo -e '\n]' >> $ALL
 
-# Uncomment to validate all-file.
-#cat $ALL | jq '.'
-
-# Refresh congressmen table.
+# Congressmen- semi-static table mapping integers to congressmen, their bioguides, parties, states, and names
 sqlite3 "$DB" "DROP TABLE IF EXISTS congressman" 
 sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS congressman (id INTEGER PRIMARY KEY, bioguide TEXT UNIQUE, lname TEXT, fname TEXT, partyId INTEGER, stateId INTEGER);" 
 
@@ -157,7 +154,7 @@ jq -c '.[]' $ALL | while read -r curMemberList; do
 done
 fi
 
-# Stage (of the bill)
+# Stage (of the bill): static table mapping integer to stage abbreviation and full description
 sqlite3 "$DB" "DROP TABLE IF EXISTS stage" 
 sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS stage (id INTEGER PRIMARY KEY, symbol TEXT, desc TEXT);" 
 sqlite3 "$DB" "insert into stage (symbol, desc) values ('IS', 'Introduced in the Senate');"
@@ -188,10 +185,11 @@ sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS contributorRole (id INTEGER PRIMARY KE
 sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('Sponsor')"
 sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('Co-Sponsor')"
 
-# Contributors: dynamic table mapping contributors and their roles to each bill
+# Contributor: dynamic table mapping contributors and their roles to each bill
 sqlite3 "$DB" "DROP TABLE IF EXISTS contributor" 
 sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS contributor (id INTEGER PRIMARY KEY, billId INTEGER, roleId INTEGER, congressmanId INTEGER);" 
 
-# Amounts: dynamic table mapping individual amounts in each bill to their purposes
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS amts (id INTEGER PRIMARY KEY, amt INTEGER, billId INTEGER, purpose TEXT, whom TEXT)";
+# Amt: dynamic table mapping individual amounts in each bill to their purposes
+sqlite3 "$DB" "DROP TABLE IF EXISTS amt" 
+sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS amt (id INTEGER PRIMARY KEY, amt INTEGER, billId INTEGER, purpose TEXT, whom TEXT)";
  
