@@ -34,8 +34,10 @@ if [ ! -d $PKG_URL_DIR ]; then
   mkdir -p $PKG_URL_DIR
 fi
 
+BE_QUIET=-s
+
 # Get this congress's first page of 100 bill summaries. (Time format in URL is yyyy-mm-dd'T'HH:mm:ss'Z'.)
-todays_bill_activity=$(curl -X 'GET' "https://api.govinfo.gov/collections/BILLS/${DATE}T00%3A00%3A00Z?pageSize=100&offsetMark=*&congress=$1&$KEY")
+todays_bill_activity=$(curl $BE_QUIET -X 'GET' "https://api.govinfo.gov/collections/BILLS/${DATE}T00%3A00%3A00Z?pageSize=100&offsetMark=*&congress=$1&$KEY")
 
 # Store the first page of results in database.
 counter=0
@@ -46,7 +48,7 @@ nextPage=$(echo "$todays_bill_activity" | jq '.nextPage' | sed 's/"//g')
 while [ ! ${nextPage} = null ]; do
   ((counter += 1))
   echo "nextPage = ${nextPage}"
-  todays_bill_activity=$(curl -X 'GET' "${nextPage}&$KEY")
+  todays_bill_activity=$(curl $BE_QUIET -X 'GET' "${nextPage}&$KEY")
   echo $todays_bill_activity | jq '.' >> ${PKG_URL_DIR}/${counter}-$DATE
   nextPage=$(echo $todays_bill_activity | jq '.nextPage' | sed 's/"//g')
 done
@@ -74,12 +76,12 @@ for f in $(ls ${PKG_URL_DIR}); do
     pkgDoc=$PKG_DIR/$formattedCounter-${pkgIds[$counter]}
     # Only curl the package if we haven't done so for this one yet.
     if [ ! -e $pkgDoc ]; then
-      curl "${pkgUrl}?$KEY" > $pkgDoc
+      curl $BE_QUIET "${pkgUrl}?$KEY" > $pkgDoc
       txtUrl=$(getVal txtLink $pkgDoc)
       txtDoc=$BDIR/txt-$formattedCounter-$id
       # Don't re-download pre-existing text docs.
       if [ ! -e $txtDoc ]; then
-        curl $txtUrl?$KEY > "$txtDoc"
+        curl $BE_QUIET $txtUrl?$KEY > "$txtDoc"
         echo $txtDoc
       fi
       if [ $? -eq 0 -a -e $txtDoc ]; then
@@ -91,6 +93,9 @@ for f in $(ls ${PKG_URL_DIR}); do
         _collectionCode=$(jq '.collectionCode' $pkgDoc | tr -d '"')
         _billNumber=$(jq '.billNumber' $pkgDoc | tr -d '"')
         desc=$(jq '.shortTitle[0].title' $pkgDoc | tr -d '"')
+        if [ "$desc" = "null" ]; then
+          desc=$(jq '.title' $pkgDoc | tr -d '"')
+        fi
         nUpdates=0 #TODO
         nPages=$(jq '.pages' $pkgDoc | tr -d '"')
         stage=$(jq '.billVersion' $pkgDoc | tr -d '"')
@@ -129,17 +134,8 @@ for f in $(ls ${PKG_URL_DIR}); do
           $createdTm,
           $lastUpdatedTm
         );'"
-        echo $execStr
+        echo $execStr  # good for debugging
         eval $execStr
-
-        # desc TEXT <-- jq '.shortTitle[0].title' <pkg name>
-        # nUpdates INTEGER <-- too much trouble for now, tech-debt this.
-        # nPages INTEGER <-- jq '.pages' <pkg name>
-        # stageId INTEGER <-- jq  '.billVersion' <pkg name>
-        # filepath TEXT <-- name the 
-        #
-        # Query all data from the 'users' table and display it 
-        #sqlite3 "$DB" "INSERT INTO bill(name, desc, nUpdates, nPages, " 
       fi
     fi
     ((counter++))
