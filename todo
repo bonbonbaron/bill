@@ -2,8 +2,18 @@
 \activity today
 \set up sqllite database
 \design tables
-implement tables
-pre-populate tables as necessary
+\implement tables
+\pre-populate tables as necessary
+TODAY'S GOAL: map bill to its table
+  name TEXT UNIQUE
+  desc TEXT
+  nUpdates INTEGER
+  nPages INTEGER
+  stageId INTEGER
+  filepath TEXT
+  createdTm INTEGER,
+  lastUpdatedTm INTEGER, 
+After that, I'll read the Bible. King David kills a giant with an 8-bit sling, much like my Raspberry Pi.
 
 pull from it in php page
 show on website

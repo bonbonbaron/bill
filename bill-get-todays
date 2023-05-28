@@ -13,20 +13,29 @@ function getVals {
 # Force bill directory to exist.
 REPO=$(readlink -f $(dirname $0))
 # Today's date in URL-acceptable format
-DATE=$(date +%Y-%m-%d)
+#DATE=$(date +%Y-%m-%d)
+# to debug, pick date in the past.
+DATE=2023-05-27
 BDIR=$REPO/db/bills/$DATE
 PKG_DIR=$BDIR/pkgs/
 PKG_URL_DIR=$PKG_DIR/urls
+DB=$REPO/.db
 # Key
-KEY="api_key=$(cat ${HOME}/.congress/CONGRESS_KEY)"
+if [ ! -e $REPO/.env ]; then
+  echo -e "You need to put a .env file into $SRC_DIR first. Populate that file like so:\n\nCONGRESS_KEY=<your API key>\n"
+  exit 1
+fi
+source $REPO/.env
+KEY="api_key=$CONGRESS_KEY"
 
 # Create directory structure.
 if [ ! -d $PKG_URL_DIR ]; then
+  echo "creating pkg url directory"
   mkdir -p $PKG_URL_DIR
 fi
 
 # Get this congress's first page of 100 bill summaries. (Time format in URL is yyyy-mm-dd'T'HH:mm:ss'Z'.)
-todays_bill_activity=$(curl -s -X 'GET' "https://api.govinfo.gov/collections/BILLS/${DATE}T00%3A00%3A00Z?pageSize=100&offsetMark=*&congress=$1&$KEY")
+todays_bill_activity=$(curl -X 'GET' "https://api.govinfo.gov/collections/BILLS/${DATE}T00%3A00%3A00Z?pageSize=100&offsetMark=*&congress=$1&$KEY")
 
 # Store the first page of results in database.
 counter=0
@@ -37,7 +46,7 @@ nextPage=$(echo "$todays_bill_activity" | jq '.nextPage' | sed 's/"//g')
 while [ ! ${nextPage} = null ]; do
   ((counter += 1))
   echo "nextPage = ${nextPage}"
-  todays_bill_activity=$(curl -s -X 'GET' "${nextPage}&$KEY")
+  todays_bill_activity=$(curl -X 'GET' "${nextPage}&$KEY")
   echo $todays_bill_activity | jq '.' >> ${PKG_URL_DIR}/${counter}-$DATE
   nextPage=$(echo $todays_bill_activity | jq '.nextPage' | sed 's/"//g')
 done
@@ -65,19 +74,72 @@ for f in $(ls ${PKG_URL_DIR}); do
     pkgDoc=$PKG_DIR/$formattedCounter-${pkgIds[$counter]}
     # Only curl the package if we haven't done so for this one yet.
     if [ ! -e $pkgDoc ]; then
-      curl -s "${pkgUrl}?$KEY" > $pkgDoc
+      curl "${pkgUrl}?$KEY" > $pkgDoc
       txtUrl=$(getVal txtLink $pkgDoc)
       txtDoc=$BDIR/txt-$formattedCounter-$id
       # Don't re-download pre-existing text docs.
       if [ ! -e $txtDoc ]; then
-        curl -s $txtUrl?$KEY > "$txtDoc"
+        curl $txtUrl?$KEY > "$txtDoc"
         echo $txtDoc
       fi
       if [ $? -eq 0 -a -e $txtDoc ]; then
-        # Insert a user into the 'users' table 
-        sqlite3 "$database_file" "INSERT INTO users (name) VALUES ('John Doe');" 
+        # First, extract all the information you need about this bill.
+        # name TEXT <-- grep out the collecion code, its trailing hyphen, congress, and the billVersion
+
+        _type=$(jq '.billType' $pkgDoc | tr -d '"')
+        _version=$(jq '.billVersion' $pkgDoc | tr -d '"')
+        _collectionCode=$(jq '.collectionCode' $pkgDoc | tr -d '"')
+        _billNumber=$(jq '.billNumber' $pkgDoc | tr -d '"')
+        desc=$(jq '.shortTitle[0].title' $pkgDoc | tr -d '"')
+        nUpdates=0 #TODO
+        nPages=$(jq '.pages' $pkgDoc | tr -d '"')
+        stage=$(jq '.billVersion' $pkgDoc | tr -d '"')
+        createdTm=$(jq '.dateIssued' $pkgDoc | date +%s | tr -d '"')
+        lastUpdatedTm=$(jq '.lastModified' $pkgDoc | date +%s | tr -d '"')
+        CONGRESS=$(jq  '.congress' $pkgDoc | tr -d '"')
+        name=$CONGRESS$_type$_billNumber  # CONGRESS number isn't technically part of "bill slug", but it'll keep it unique across congresses.
+        filepath="$REPO/db/$CONGRESS/$name"
+
+        if [ ! -d $filepath ]; then
+          echo "creating filepath $filepath"
+          mkdir -p $filepath
+          if [ $? -ne 0 ]; then
+            echo "error making directory $filepath. Exitting..."
+            exit 1
+          fi
+        fi
+
+        execStr="
+        sqlite3 '$DB' 'INSERT INTO bill (
+          name,
+          desc,
+          nUpdates,
+          nPages,
+          stageId,
+          filepath,
+          createdTm,
+          lastUpdatedTm)
+        VALUES (
+          \"$name\",
+          \"$desc\",
+          $nUpdates,
+          $nPages,
+          (select id from stage where lower(symbol) = lower(\"$stage\")),
+          \"$filepath\",
+          $createdTm,
+          $lastUpdatedTm
+        );'"
+        echo $execStr
+        eval $execStr
+
+        # desc TEXT <-- jq '.shortTitle[0].title' <pkg name>
+        # nUpdates INTEGER <-- too much trouble for now, tech-debt this.
+        # nPages INTEGER <-- jq '.pages' <pkg name>
+        # stageId INTEGER <-- jq  '.billVersion' <pkg name>
+        # filepath TEXT <-- name the 
+        #
         # Query all data from the 'users' table and display it 
-        sqlite3 "$database_file" "SELECT bill-get-todays db gpt-out new.db secs select select bill-get-todays db gpt-out new.db secs select select bill-get-todays db gpt-out new.db secs select select bill-get-todays db gpt-out new.db secs select select * from amts todo from amts todo from amts todo from amts todo FROM users;" 
+        #sqlite3 "$DB" "INSERT INTO bill(name, desc, nUpdates, nPages, " 
       fi
     fi
     ((counter++))

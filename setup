@@ -1,25 +1,30 @@
 #!/bin/bash
 
 # Vars
-DB="${HOME}/new.db" 
-KEY="api_key=$(cat ${HOME}/.congress/CONGRESS_KEY)"
+SRC_DIR=$(readlink -f $(dirname $0))
+DB="$SRC_DIR/.db" 
+if [ ! -e $SRC_DIR/.env ]; then
+  echo -e "You need to put a .env file into $SRC_DIR first. Populate that file like so:\n\nCONGRESS_KEY=<your API key>\n"
+  exit 1
+fi
+source $SRC_DIR/.env
 BASE=$(readlink -f $(dirname $0))
 MEMDIR=$BASE/.members
 ALL=$MEMDIR/all
 
-# Chamber
+# Chamber: static table mapping integers to chamber letter-codes.
 sqlite3 "$DB" "DROP TABLE IF EXISTS chamber"
 sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS chamber (id INTEGER PRIMARY KEY, abbrev TEXT UNIQUE, desc TEXT UNIQUE)"
 sqlite3 "$DB" "insert into chamber (abbrev, desc) values ('s', 'Senate')"
 sqlite3 "$DB" "insert into chamber (abbrev, desc) values ('h', 'House')"
 
-# Parties
+# Parties: static table mapping integers to party letter-codes.
 sqlite3 "$DB" "DROP TABLE IF EXISTS party"
 sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS party (id INTEGER PRIMARY KEY, abbrev TEXT UNIQUE, desc TEXT UNIQUE);" 
 sqlite3 "$DB" "insert into party (abbrev, desc) values ('R', 'Republican');"
 sqlite3 "$DB" "insert into party (abbrev, desc) values ('D', 'Democratic');"
 
-# States
+# States: static table mapping integers to state abbreviations and full names.
 sqlite3 "$DB" "DROP TABLE IF EXISTS state"
 sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY, abbrev TEXT UNIQUE, fullName TEXT UNIQUE);" 
 sqlite3 "$DB" "insert into state (abbrev, fullName) values ('AL', 'Alabama');"
@@ -74,8 +79,10 @@ sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WI', 'Wisconsin');"
 sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WY', 'Wyoming');"
 
 
-# Bills
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS bill (id INTEGER PRIMARY KEY, name TEXT UNIQUE, desc TEXT, nUpdates INTEGER, nPages INTEGER, stageId INTEGER, filepath TEXT);" 
+# Bills: dynamic table mapping bills to bill filepaths, metadata, stage, and (site-searchable) description or title.
+# NOTE: lastUpdateTm is in seconds since epoch.
+sqlite3 "$DB" "DROP TABLE IF EXISTS bill" 
+sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS bill (id INTEGER PRIMARY KEY, name TEXT UNIQUE, desc TEXT, nUpdates INTEGER, nPages INTEGER, stageId INTEGER, createdTm INTEGER, lastUpdatedTm INTEGER, filepath TEXT);" 
 
 # Congressmen
 # Ensure members directory exists.
@@ -91,6 +98,7 @@ cfile=$MEMDIR/mem$COUNTER
 
 # Iteratively curl all the congressmen into the bucket.
 # The API gives no way to distinguish which congress each member is in, so just take them all.
+if false; then # tech-debt
 curl -X GET "https://api.congress.gov/v3/member/?congress=118&$KEY&offset=2400&limit=100&congress=118" > $cfile
 nextMembers="$(cat $cfile | jq '.pagination.next' | tr -d '"')&$KEY"
 echo $nextMembers
@@ -147,6 +155,7 @@ jq -c '.[]' $ALL | while read -r curMemberList; do
   done
   break
 done
+fi
 
 # Stage (of the bill)
 sqlite3 "$DB" "DROP TABLE IF EXISTS stage" 
@@ -173,16 +182,16 @@ sqlite3 "$DB" "insert into stage (symbol, desc) values ('ES', 'Bill passed by Se
 sqlite3 "$DB" "insert into stage (symbol, desc) values ('EH', 'Bill passed by Senate and certified by its clerk/secretary');"
 sqlite3 "$DB" "insert into stage (symbol, desc) values ('ENR', 'Enrolled');"
 
-# Role
-sqlite3 "$DB" "DROP TABLE IF EXISTS contributorRole"
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS contributorRole (id INTEGER PRIMARY KEY, desc TEXT UNIQUE"
+# Role: static table mapping integers to roles
+sqlite3 "$DB" "DROP TABLE IF EXISTS contributorRole" 
+sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS contributorRole (id INTEGER PRIMARY KEY, desc TEXT UNIQUE)"
 sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('Sponsor')"
 sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('Co-Sponsor')"
 
-# Contributors
-sqlite3 "$DB" "DROP TABLE IF EXISTS contributor"
+# Contributors: dynamic table mapping contributors and their roles to each bill
+sqlite3 "$DB" "DROP TABLE IF EXISTS contributor" 
 sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS contributor (id INTEGER PRIMARY KEY, billId INTEGER, roleId INTEGER, congressmanId INTEGER);" 
 
-# Amounts
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS gpt_amts (id INTEGER PRIMARY KEY, amt INTEGER, purpose TEXT, whom TEXT)";
-
+# Amounts: dynamic table mapping individual amounts in each bill to their purposes
+sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS amts (id INTEGER PRIMARY KEY, amt INTEGER, billId INTEGER, purpose TEXT, whom TEXT)";
+ 
