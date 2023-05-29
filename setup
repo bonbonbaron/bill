@@ -8,6 +8,11 @@ if [ ! -e $SRC_DIR/.env ]; then
   exit 1
 fi
 source $SRC_DIR/.env
+if [ -z "$CONGRESS_KEY" ]; then
+  echo '$CONGRESS_KEY is undefined. Exitting...'
+  exit 1
+fi
+KEY="api_key=$CONGRESS_KEY"
 BASE=$(readlink -f $(dirname $0))
 MEMDIR=$BASE/.members
 ALL=$MEMDIR/all
@@ -84,6 +89,7 @@ sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WY', 'Wyoming');"
 sqlite3 "$DB" "DROP TABLE IF EXISTS bill" 
 sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS bill (id INTEGER PRIMARY KEY, name TEXT UNIQUE, desc TEXT, nUpdates INTEGER, nPages INTEGER, stageId INTEGER, createdTm INTEGER, lastUpdatedTm INTEGER, filepath TEXT);" 
 
+if false; then # tech-debt
 # Congressmen
 # Ensure members directory exists.
 if [ ! -d $MEMDIR ]; then
@@ -98,21 +104,19 @@ cfile=$MEMDIR/mem$COUNTER
 
 # Iteratively curl all the congressmen into the bucket.
 # The API gives no way to distinguish which congress each member is in, so just take them all.
-if false; then # tech-debt
-curl -X GET "https://api.congress.gov/v3/member/?congress=118&$KEY&offset=2400&limit=100&congress=118" > $cfile
+curl -X GET "https://api.congress.gov/v3/member/?congress=118&$KEY&offset=2200&limit=100&congress=118" > $cfile
 nextMembers="$(cat $cfile | jq '.pagination.next' | tr -d '"')&$KEY"
-echo $nextMembers
+#echo $nextMembers
 while [ $? -eq 0 ]; do
   ((COUNTER += 1))
   cfile=$MEMDIR/mem$COUNTER
-  echo "cur file is $cfile"
   newMembers=$(curl -X GET $nextMembers)
   # Use jq to force good formatting, as API doesn't always behave.
   echo -e "$(echo $newMembers | jq '.')" > $cfile
   # Get link to next page of congressmen.
   nextMembers=$(echo $newMembers | jq '.pagination.next')
-  echo nextMem is $nextMembers
-  echo $nextMembers
+  #echo nextMem is $nextMembers
+  #echo $nextMembers
   if [ -z "$nextMembers" -o $nextMembers = 'null' ]; then
     break
   fi
@@ -131,6 +135,7 @@ for m in $(ls $MEMDIR/mem*); do
   cat $m >> $ALL
 done
 echo -e '\n]' >> $ALL
+fi
 
 # Congressmen- semi-static table mapping integers to congressmen, their bioguides, parties, states, and names
 sqlite3 "$DB" "DROP TABLE IF EXISTS congressman" 
@@ -140,7 +145,7 @@ sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS congressman (id INTEGER PRIMARY KEY, b
 jq -c '.[]' $ALL | while read -r curMemberList; do
   echo $curMemberList | jq -c '.members[] ' | while read -r curMember; do
     bioguide=$(echo $curMember | jq '.member.bioguideId' | tr -d '"')
-    name=$(echo $curMember | jq '.member.name' | tr -d '"')
+    name=$(echo $curMember | jq '.member.name' | tr -d '"') 
     lname=$(echo $name | sed -E 's/(.*),.*/\1/')
     fname=$(echo $name | sed -E 's/.*,(.*)/\1/')
     party=$(echo $curMember | jq '.member.party' | tr -d '"')
@@ -148,11 +153,10 @@ jq -c '.[]' $ALL | while read -r curMemberList; do
     partyId=$(sqlite3 $DB "select id from party where desc = '$party'")
     stateId=$(sqlite3 $DB "select id from state where fullName = '$state'")
     sqlite3 "$DB" "insert into congressman (bioguide, lname, fname, partyId, stateId) values\
-      ('$bioguide', '$lname', '$fname', '$partyId', '$stateId')"
+      (\"$bioguide\", \"$lname\", \"$fname\", \"$partyId\", \"$stateId\")"
   done
   break
 done
-fi
 
 # Stage (of the bill): static table mapping integer to stage abbreviation and full description
 sqlite3 "$DB" "DROP TABLE IF EXISTS stage" 
