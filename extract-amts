@@ -1,0 +1,59 @@
+#!/bin/bash
+
+function extractAmt() {
+  if [ $# -ne 1 ]; then
+    echo "Supposed to have one bill filepath input."
+    exit 1
+  fi
+
+  # Variables
+  BILL="$1"
+  NAME=$(basename $1)
+  BDIR=$(readlink -f $(dirname "$1"))
+  pkgDoc=$(find $BDIR/.pkg -name 'pkg-*')
+  DB=$(readlink -f $(dirname $0))/.db
+
+  # Derive the bill's ID for database relationships.
+  _type=$(jq '.billType' $pkgDoc | tr -d '"')
+  _billNumber=$(jq '.billNumber' $pkgDoc | tr -d '"')
+  _congress=$(jq '.congress' $pkgDoc | tr -d '"')
+  name=$_congress$_type$_billNumber
+  billId=$(sqlite3 $DB "select id from bill where name='$name'")
+
+  # Extra dollar amounts
+  input=($(grep -ob -E '\$ ?[0-9,\.]+' $1))
+  if [ ${#input[*]} -eq 0 ]; then
+    if grep '\$' $1; then
+      printf '\t\e[1,31Dollar signs missed\n'
+      exit
+    fi
+    return
+  fi
+
+  #prompt="List purposes of these amounts in simple language: "
+  insertStatement="INSERT INTO amt (amt, billId, offset) VALUES "
+  FIRST=0
+  for i in ${input[*]}; do
+    if [ $FIRST -ne 0 ]; then
+      insertStatement+=", "
+    fi
+    FIRST=1
+    offset="$(echo $i | awk -F: '{print $1}')"
+    amount="$(echo $i | awk -F: '{print $2}' | sed -E 's/([0-9,\.]+),\s*$/\1/g')"
+    amount=$(echo $amount | sed -E 's/[$,]//g; s/([0-9\.]+)\.$/\1/')
+    insertStatement+="($amount, $billId, $offset)"
+    if [ $? -ne 0 ]; then
+      echo error
+      exit 1
+    fi
+    if [ $? -ne 0 ]; then
+      echo error
+      exit 1
+    fi
+    # billId: $CONGRESS$_TYPE$_BILLNUMBER
+  done
+
+  sqlite3 $DB "$insertStatement;"
+  total=$(sqlite3 $DB "select sum(amt) from amt where billId = '$billId' group by billId")
+  printf "\ttotal: \$%'21.2f\n" $total
+}

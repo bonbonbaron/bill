@@ -1,0 +1,79 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]; then
+  echo "Supposed to have one bill filepath input."
+  exit 1
+fi
+
+# Variables
+BILL="$1"
+NAME=$(basename $1)
+BDIR=$(readlink -f $(dirname "$1"))
+SDIR=$BDIR/.sections
+ADIR=$BDIR/.amts
+
+# Make this bill's directories for sections and amounts
+mkdir -p $SDIR 2>/dev/null
+mkdir -p $ADIR 2>/dev/null
+
+# Make array of line numbers of SEC* occurrences.
+unalias grep 2>/dev/null
+lns=()
+lns+=($(grep -n -E "^\s*SEC" $1 | cut -d: -f1))
+
+# Make a counter to iterate through array with.
+s=0
+maxS=${#lns[*]}
+
+# Scoop up everything between sections.
+while [ $s -lt $(($maxS - 1)) ]; do
+  fn=$SDIR/$(printf %05d $s)
+  sed -n "$((${lns[$s]} + 1)),$((${lns[$((s + 1))]} - 1))p" $1 > $fn &
+  ((++s))
+done
+
+# Scoop up the last section.
+fn=$SDIR/$(printf %05d $s)
+sed -n "$((${lns[$s]} + 1)),\$p" $1 > $fn
+
+# Only process the files with dollar amounts. Keep the others in case you want to summarize them generally later.
+buckSections=($(grep -l '\$' $SDIR/*))
+
+# Fire away all the sections with their amounts.
+for bs in ${buckSections[*]}; do
+  echo $bs
+  section=$(basename $bs)
+  input=($(grep -ob -E '\$ ?[0-9,\.]+' $bs))
+  #prompt="List purposes of these amounts in simple language: "
+  total=0
+  unset amtA
+  amtA=()
+  for i in ${input[*]}; do
+    offset="$(echo $i | awk -F: '{print $1}')"
+    amount="$(echo $i | awk -F: '{print $2}' | sed -E 's/([0-9,\.]+),\s*$/\1/g')"
+    amount=$(echo $amount | sed -E 's/[$,]//g; s/([0-9\.]+)\.$/\1/')
+    amtA
+    printf "\t\t\$%'20.2f\n" $amount
+    if [ $? -ne 0 ]; then
+      echo error
+      exit 1
+    fi
+    total=$(bc <<< "$total + $amount")
+    #prompt+="$amount (char $offset), "
+    #prompt="Summarize amount $amount mentioned around character $offset" 
+    if [ $? -ne 0 ]; then
+      echo error
+      exit 1
+    fi
+  done
+  printf "\t$bs: \$%'20.2f\n" $total
+  #prompt=$(echo "$prompt" | sed -E 's/,\s*$//g')
+  #echo $prompt
+  # ChatGPT isn't reliably consistent enough in its output yet to use for a public website.
+  # Instead, we'll list the total dollars mentioned in each bill.
+  # We can at least use ChatGPT to summarize each section in easy language, but that's NTH.
+
+  #gpt -C "$NAME_$section_$offset" -f "$bs" "$prompt" &
+  #sleep 5
+  #exit
+done

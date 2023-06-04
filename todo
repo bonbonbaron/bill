@@ -5,7 +5,8 @@
 \implement tables
 \pre-populate tables as necessary
 \TODAY'S GOAL: map bill to its table
-NEXT GOAL: fix congressmen semi-static table and map bill's contributors to its table
+\NEXT GOAL: fix congressmen semi-static table and map bill's contributors to its table
+Make gpt multithreadable for firing all questions at oncer
 NEXT GOAL: map bill's stage to its table
 After that, I'll read the Bible. King David kills a giant with an 8-bit sling, much like my Raspberry Pi.
 

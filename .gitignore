@@ -5,3 +5,6 @@ db/
 **/*.sw*
 **/.env
 **/.db
+.members/
+.pkgs/
+temp

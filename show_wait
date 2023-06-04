@@ -1,0 +1,25 @@
+#!/bin/bash
+
+show_wait() {
+  printf "\r                 \r"
+  echo "$@"
+  trap "printf '\r              \r'" SIGTERM SIGKILL
+  while true; do
+    printf "\r|       "
+    sleep 0.35
+    printf "\r /      "
+    sleep 0.2
+    printf "\r  _     "
+    sleep 0.1
+    printf "\r   \\    "
+    sleep 0.2
+    printf "\r    |   "
+    sleep 0.3
+    printf "\r   \\    " 
+    sleep 0.2
+    printf "\r  _     "
+    sleep 0.1
+    printf "\r /      "
+    sleep 0.2
+  done
+}

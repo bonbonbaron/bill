@@ -14,9 +14,7 @@ function getVals {
 REPO=$(readlink -f $(dirname $0))
 # Today's date in URL-acceptable format
 #DATE=$(date +%Y-%m-%d)
-# to debug, pick date in the past.
-DATE=2023-05-27
-BDIR=$REPO/db/bills/$DATE
+DATE=2023-06-01 # to debug, pick date in the past.
 PKG_URL_DIR=$REPO/.pkgs/
 DB=$REPO/.db
 # Key
@@ -29,6 +27,8 @@ if [ ! -d $PKG_URL_DIR ]; then
   mkdir -p $PKG_URL_DIR
 fi
 
+source $REPO/show_wait
+source $REPO/extract-amts
 source $REPO/.env
 KEY="api_key=$CONGRESS_KEY"
 
@@ -59,14 +59,18 @@ procBillPkg $todays_bill_activity
 
 
 # If there are anymore pages beyond the first, retrieve and store them in the databse as well.
+#show_wait "Retrieving today's bill activity..." 2>/dev/null &
+wpid=$!
+
 nextPage=$(echo "$todays_bill_activity" | jq '.nextPage' | sed 's/"//g')
 while [ ! ${nextPage} = null ]; do
-  echo "nextPage = ${nextPage}"
+  #echo "nextPage = ${nextPage}"
   todays_bill_activity=$(curl $BE_QUIET -X 'GET' "${nextPage}&$KEY")
   procBillPkg $todays_bill_activity
   nextPage=$(echo $todays_bill_activity | jq '.nextPage' | sed 's/"//g')
 done
 
+#kill -KILL $wpid 
 rm -f $TMP
 
 # For all bill activities today...
@@ -86,6 +90,8 @@ for f in $(ls $PKG_URL_DIR); do
   while [ $counter -lt $maxCounter ]; do
     id=${pkgIds[$counter]}
     pkgUrl=${pkgUrls[$counter]}
+    #show_wait "Processing bill $id..." 2>/dev/null &
+    wpid=$!
     # I append the counter to the package ID *just in case* there's multiple activity on the same document.
     # Don't re-download pre-existing text docs.
     formattedCounter=$(printf '%03d' $counter)
@@ -100,9 +106,9 @@ for f in $(ls $PKG_URL_DIR); do
     pkgDoc=$pkgPath/pkg-$name
     mv $TMP $pkgDoc
     txtUrl=$(getVal txtLink $pkgDoc)
-    txtDoc=$pkgPath/../$name
+    txtDoc=$(readlink -f $pkgPath/../$name)
     curl $BE_QUIET $txtUrl?$KEY > "$txtDoc"
-    echo $txtDoc
+    #echo $txtDoc
     if [ $? -eq 0 -a -e $txtDoc ]; then
       # First, extract all the information you need about this bill.
       # name TEXT <-- grep out the collecion code, its trailing hyphen, congress, and the billVersion
@@ -119,7 +125,8 @@ for f in $(ls $PKG_URL_DIR); do
       nPages=$(jq '.pages' $pkgDoc | tr -d '"')
       stage=$(jq '.billVersion' $pkgDoc | tr -d '"')
       createdTm=$(jq '.dateIssued' $pkgDoc | date +%s | tr -d '"')
-      lastUpdatedTm=$(jq '.lastModified' $pkgDoc | date +%s | tr -d '"')
+      #lastUpdatedTm=$(jq '.lastModified' $pkgDoc | date +%s | tr -d '"')  not accurate in the database sense
+      lastUpdatedTm=$(date +%s)
       CONGRESS=$(jq  '.congress' $pkgDoc | tr -d '"')
       name=$CONGRESS$_type$_billNumber  # CONGRESS number isn't technically part of "bill slug", but it'll keep it unique across congresses.
       filepath="$REPO/db/$CONGRESS/$name"
@@ -133,6 +140,8 @@ for f in $(ls $PKG_URL_DIR); do
         fi
       fi
 
+      # Bill table insertion
+      printf "%s\n" "$name - $desc"
       execStr="
       sqlite3 '$DB' 'INSERT INTO bill (
         name,
@@ -149,14 +158,38 @@ for f in $(ls $PKG_URL_DIR); do
         $nUpdates,
         $nPages,
         (select id from stage where lower(symbol) = lower(\"$stage\")),
-        \"$filepath\",
+        \"$txtDoc\",
         $createdTm,
         $lastUpdatedTm
       );'"
-      echo $execStr  # good for debugging
-      eval $execStr
+      #echo $execStr  # good for debugging
+      eval $execStr 2>/dev/null
+
+      # Contributor table insertion
+      nMembers=$(jq '.members | length' $pkgDoc)
+      i=0
+      while [ $i -lt $nMembers ]; do
+        bgid=$(jq ".members[$i].bioGuideId" $pkgDoc | tr -d '"')
+        role=$(jq ".members[$i].role" $pkgDoc | tr -d '"')
+        execStr="
+        sqlite3 '$DB' 'INSERT INTO contributor (
+          billId,
+          roleId,
+          congressmanId)
+        VALUES (
+          (select id from bill where lower(name) = lower(\"$name\")),
+          (select id from congressman where lower(bioguide) = lower(\"$bgid\")),
+          (select id from contributorRole where lower(desc) = lower(\"$role\")))';"
+        
+        eval $execStr #2>/dev/null
+        ((++i))
+      done
+
+      # Amount table insertion
+      extractAmt $txtDoc
     fi
     ((counter++))
+    #kill -KILL $wpid 
   done
 done
-exit
+#kill -KILL $wpid 
