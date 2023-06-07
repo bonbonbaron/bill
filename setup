@@ -1,10 +1,8 @@
 #!/bin/bash
 
-wpid=0
-trap "if [ $wpid -ne 0 ]; then kill -KILL $wpid; done" SIGTERM SIGKILL
-
-source show_wait
-
+#source show_wait
+#wpid=0
+#trap "if [ $wpid -ne 0 ]; then kill -KILL $wpid; done" SIGTERM SIGKILL
 # Vars
 SRC_DIR=$(readlink -f $(dirname $0))
 DB="$SRC_DIR/.db" 
@@ -22,172 +20,191 @@ BASE=$(readlink -f $(dirname $0))
 MEMDIR=$BASE/.members
 
 
-show_wait "Setting up static tables..." &
-wpid=$!
+if false; then
 
-# Chamber: static table mapping integers to chamber letter-codes.
-sqlite3 "$DB" "DROP TABLE IF EXISTS chamber"
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS chamber (id INTEGER PRIMARY KEY, abbrev TEXT UNIQUE, desc TEXT UNIQUE)"
-sqlite3 "$DB" "insert into chamber (abbrev, desc) values ('s', 'Senate')"
-sqlite3 "$DB" "insert into chamber (abbrev, desc) values ('h', 'House')"
+    #show_wait "Setting up static tables..." &
+    #wpid=$!
 
-# Parties: static table mapping integers to party letter-codes.
-sqlite3 "$DB" "DROP TABLE IF EXISTS party"
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS party (id INTEGER PRIMARY KEY, abbrev TEXT UNIQUE, desc TEXT UNIQUE);" 
-sqlite3 "$DB" "insert into party (abbrev, desc) values ('R', 'Republican');"
-sqlite3 "$DB" "insert into party (abbrev, desc) values ('D', 'Democratic');"
+    # Chamber: static table mapping integers to chamber letter-codes.
+    sqlite3 "$DB" "DROP TABLE IF EXISTS chamber"
+    sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS chamber (id INTEGER PRIMARY KEY, abbrev TEXT UNIQUE, desc TEXT UNIQUE)"
+    sqlite3 "$DB" "insert into chamber (abbrev, desc) values ('s', 'Senate')"
+    sqlite3 "$DB" "insert into chamber (abbrev, desc) values ('h', 'House')"
 
-# States: static table mapping integers to state abbreviations and full names.
-sqlite3 "$DB" "DROP TABLE IF EXISTS state"
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY, abbrev TEXT UNIQUE, fullName TEXT UNIQUE);" 
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('AL', 'Alabama');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('AK', 'Alaska');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('AZ', 'Arizona');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('AR', 'Arkansas');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('CA', 'California');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('CO', 'Colorado');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('CT', 'Connecticut');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('DE', 'Delaware');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('FL', 'Florida');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('GA', 'Georgia');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('HI', 'Hawaii');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('ID', 'Idaho');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('IL', 'Illinois');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('IN', 'Indiana');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('IA', 'Iowa');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('KS', 'Kanas');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('KY', 'Kentucky');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('LA', 'Lousiana');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('ME', 'Maine');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MD', 'Maryland');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MA', 'Massachusetts');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MI', 'Michigan');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MN', 'Minnesota');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MS', 'Mississippi');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MO', 'Missouri');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MT', 'Montana');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NE', 'Nebraska');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NV', 'Nevada');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NH', 'New Hampshire');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NJ', 'New Jersey');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NM', 'New Mexico');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NY', 'New York');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NC', 'North Carolina');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('ND', 'North Dakota');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('OH', 'Ohio');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('OK', 'Oklahoma');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('OR', 'Oregon');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('PA', 'Pennsylvania');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('RI', 'Rhode Island');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('SC', 'South Carolina');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('SD', 'South Dakota');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('TN', 'Tennessee');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('TX', 'Texas');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('UT', 'Utah');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('VT', 'Vermont');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('VA', 'Virginia');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WA', 'Washington');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WV', 'West Virginia');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WI', 'Wisconsin');"
-sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WY', 'Wyoming');"
+    # Parties: static table mapping integers to party letter-codes.
+    sqlite3 "$DB" "DROP TABLE IF EXISTS party"
+    sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS party (id INTEGER PRIMARY KEY, abbrev TEXT UNIQUE, desc TEXT UNIQUE);" 
+    sqlite3 "$DB" "insert into party (abbrev, desc) values ('R', 'Republican');"
+    sqlite3 "$DB" "insert into party (abbrev, desc) values ('D', 'Democratic');"
 
-# Stage (of the bill): static table mapping integer to stage abbreviation and full description
-sqlite3 "$DB" "DROP TABLE IF EXISTS stage" 
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS stage (id INTEGER PRIMARY KEY, symbol TEXT, desc TEXT);" 
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('IS', 'Introduced in the Senate');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('IH', 'Introduced in the House');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('RAS', 'Referred with Amendments by the Senate to the House');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('RAH', 'Referred with Amendments in the House to the Senate');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('RFS', 'Referred by Senate to commitees concerned');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('RFH', 'Referred by House to commitees concerned');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('RDS', 'Accepted for consideration in Senate');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('RDH', 'Accepted for consideration in House');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('RCS', 'Change of bill referral in Senate');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('RCH', 'Change of bill referral in House');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('RS', 'Committee reported its findings in Senate');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('RH', 'Committee reported its findings in House');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('PCS', 'Placed on calendar for committee in Senate to review');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('PCH', 'Placed on calendar for committee in House to review');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('CPS', 'After debate, bill has been voted and passed in Senate');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('CPH', 'After debate, bill has been voted and passed in House');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('EAS', 'Bill passed by Senate and certified by its clerk/secretary; includes amendments');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('EAH', 'Bill passed by Senate and certified by its clerk/secretary; includes amendments');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('ES', 'Bill passed by Senate and certified by its clerk/secretary');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('EH', 'Bill passed by Senate and certified by its clerk/secretary');"
-sqlite3 "$DB" "insert into stage (symbol, desc) values ('ENR', 'Enrolled');"
+    # States: static table mapping integers to state abbreviations and full names.
+    sqlite3 "$DB" "DROP TABLE IF EXISTS state"
+    sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY, abbrev TEXT UNIQUE, fullName TEXT UNIQUE);" 
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('AL', 'Alabama');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('AK', 'Alaska');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('AZ', 'Arizona');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('AR', 'Arkansas');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('CA', 'California');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('CO', 'Colorado');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('CT', 'Connecticut');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('DE', 'Delaware');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('FL', 'Florida');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('GA', 'Georgia');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('HI', 'Hawaii');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('ID', 'Idaho');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('IL', 'Illinois');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('IN', 'Indiana');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('IA', 'Iowa');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('KS', 'Kanas');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('KY', 'Kentucky');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('LA', 'Lousiana');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('ME', 'Maine');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MD', 'Maryland');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MA', 'Massachusetts');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MI', 'Michigan');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MN', 'Minnesota');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MS', 'Mississippi');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MO', 'Missouri');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('MT', 'Montana');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NE', 'Nebraska');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NV', 'Nevada');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NH', 'New Hampshire');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NJ', 'New Jersey');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NM', 'New Mexico');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NY', 'New York');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('NC', 'North Carolina');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('ND', 'North Dakota');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('OH', 'Ohio');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('OK', 'Oklahoma');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('OR', 'Oregon');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('PA', 'Pennsylvania');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('RI', 'Rhode Island');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('SC', 'South Carolina');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('SD', 'South Dakota');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('TN', 'Tennessee');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('TX', 'Texas');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('UT', 'Utah');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('VT', 'Vermont');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('VA', 'Virginia');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WA', 'Washington');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WV', 'West Virginia');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WI', 'Wisconsin');"
+    sqlite3 "$DB" "insert into state (abbrev, fullName) values ('WY', 'Wyoming');"
 
-# Role: static table mapping integers to roles
-sqlite3 "$DB" "DROP TABLE IF EXISTS contributorRole" 
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS contributorRole (id INTEGER PRIMARY KEY, desc TEXT UNIQUE)"
-sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('Sponsor')"
-sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('Co-Sponsor')"
+    # Stage (of the bill): static table mapping integer to stage abbreviation and full description
+    sqlite3 "$DB" "DROP TABLE IF EXISTS stage" 
+    sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS stage (id INTEGER PRIMARY KEY, symbol TEXT, desc TEXT);" 
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('IS', 'Introduced in the Senate');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('IH', 'Introduced in the House');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('RAS', 'Referred with Amendments by the Senate to the House');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('RAH', 'Referred with Amendments in the House to the Senate');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('RFS', 'Referred by Senate to commitees concerned');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('RFH', 'Referred by House to commitees concerned');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('RDS', 'Accepted for consideration in Senate');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('RDH', 'Accepted for consideration in House');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('RCS', 'Change of bill referral in Senate');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('RCH', 'Change of bill referral in House');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('RS', 'Committee reported its findings in Senate');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('RH', 'Committee reported its findings in House');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('PCS', 'Placed on calendar for committee in Senate to review');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('PCH', 'Placed on calendar for committee in House to review');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('CPS', 'After debate, bill has been voted and passed in Senate');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('CPH', 'After debate, bill has been voted and passed in House');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('EAS', 'Bill passed by Senate and certified by its clerk/secretary; includes amendments');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('EAH', 'Bill passed by Senate and certified by its clerk/secretary; includes amendments');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('ES', 'Bill passed by Senate and certified by its clerk/secretary');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('EH', 'Bill passed by Senate and certified by its clerk/secretary');"
+    sqlite3 "$DB" "insert into stage (symbol, desc) values ('ENR', 'Enrolled');"
 
-kill -KILL $wpid &>/dev/null
+    # Role: static table mapping integers to roles
+    sqlite3 "$DB" "DROP TABLE IF EXISTS contributorRole" 
+    sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS contributorRole (id INTEGER PRIMARY KEY, desc TEXT UNIQUE)"
+    sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('Sponsor')"
+    sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('Co-Sponsor')"
 
-# Ensure members directory exists.
-if [ ! -d $MEMDIR ]; then
-  mkdir -p $MEMDIR
-fi
-# Clear out member directory.
-rm -f $MEMDIR/*
+    #kill -KILL $wpid &>/dev/null
 
-# Member files are counted by curl iterations.
-COUNTER=0
-cfile=$MEMDIR/mem$COUNTER
+    # Ensure members directory exists.
+    if [ ! -d $MEMDIR ]; then
+      mkdir -p $MEMDIR
+    fi
+    # Clear out member directory.
+    rm -f $MEMDIR/*
 
-show_wait "Curling congressmen data..." &
-wpid=$!
-# Congressmen
-# Iteratively curl all the congressmen into the bucket.
-# The API gives no way to distinguish which congress each member is in, so just take them all.
-curl -s -X GET "https://api.congress.gov/v3/member/?congress=118&$KEY&offset=0&limit=100&congress=118" > $cfile
-nextMembers="$(cat $cfile | jq '.pagination.next' | tr -d '"')&$KEY"
-#echo $nextMembers
-while [ $? -eq 0 ]; do
-  ((COUNTER += 1))
-  cfile=$MEMDIR/mem$COUNTER
-  newMembers=$(curl -s -X GET $nextMembers)
-  # Use jq to force good formatting, as API doesn't always behave.
-  echo -e "$(echo $newMembers | jq '.')" > $cfile
-  # Get link to next page of congressmen.
-  nextMembers=$(echo $newMembers | jq '.pagination.next')
-  #echo nextMem is $nextMembers
-  #echo $nextMembers
-  if [ -z "$nextMembers" -o $nextMembers = 'null' ]; then
-    break
-  fi
-  nextMembers="$(echo $nextMembers | tr -d '"')&congress=118&$KEY"
-  #echo $nextMembers
-done
+    # Member files are counted by curl iterations.
+    COUNTER=0
+    cfile=$MEMDIR/mem$COUNTER
 
-kill -KILL $wpid &>/dev/null
-show_wait "Inserting congressmen data into table..." &
-wpid=$!
+    #show_wait "Curling congressmen data..." &
+    #wpid=$!
+    # Congressmen
+    # Iteratively curl all the congressmen into the bucket.
+    # The API gives no way to distinguish which congress each member is in, so just take them all.
+    curl -s -X GET "https://api.congress.gov/v3/member/?congress=118&$KEY&offset=0&limit=100&congress=118" > $cfile
+    nextMembers="$(cat $cfile | jq '.pagination.next' | tr -d '"')&$KEY"
+    #echo $nextMembers
+    while [ $? -eq 0 ]; do
+      ((COUNTER += 1))
+      cfile=$MEMDIR/mem$COUNTER
+      newMembers=$(curl -s -X GET $nextMembers)
+      # Use jq to force good formatting, as API doesn't always behave.
+      echo -e "$(echo $newMembers | jq '.')" > $cfile
+      # Get link to next page of congressmen.
+      nextMembers=$(echo $newMembers | jq '.pagination.next')
+      #echo nextMem is $nextMembers
+      #echo $nextMembers
+      if [ -z "$nextMembers" -o $nextMembers = 'null' ]; then
+        break
+      fi
+      nextMembers="$(echo $nextMembers | tr -d '"')&congress=118&$KEY"
+      #echo $nextMembers
+    done
+
+    #kill -KILL $wpid &>/dev/null
+fi # if false
+
+#show_wait "Generating congressmen insert statement..." &
+#wpid=$!
 # Congressmen- semi-static table mapping integers to congressmen, their bioguides, parties, states, and names
 sqlite3 "$DB" "DROP TABLE IF EXISTS congressman" 
 sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS congressman (id INTEGER PRIMARY KEY, bioguide TEXT UNIQUE, lname TEXT, fname TEXT, partyId INTEGER, stateId INTEGER);" 
 
 # Iterate over all congressmen in each member file to put them into database.
+insertStmt="insert into congressman (bioguide, lname, fname, partyId, stateId) values "
+FIRST=0
+nMemFiles=$(ls $MEMDIR/mem* | wc -l)
 for memfile in $(ls $MEMDIR/mem*); do
-  jq -c '.' $memfile | while read -r curMemberList; do
-    echo $curMemberList | jq -c '.members[] ' | while read -r curMember; do
-      bioguide=$(echo $curMember | jq '.member.bioguideId' | tr -d '"')
-      name=$(echo $curMember | jq '.member.name' | tr -d '"') 
-      lname=$(echo $name | sed -E 's/(.*),.*/\1/')
-      fname=$(echo $name | sed -E 's/.*,(.*)/\1/')
-      party=$(echo $curMember | jq '.member.party' | tr -d '"')
-      state=$(echo $curMember | jq '.member.state' | tr -d '"')
-      partyId=$(sqlite3 $DB "select id from party where desc = '$party'")
-      stateId=$(sqlite3 $DB "select id from state where fullName = '$state'")
-      sqlite3 "$DB" "insert into congressman (bioguide, lname, fname, partyId, stateId) values\
-        (\"$bioguide\", \"$lname\", \"$fname\", \"$partyId\", \"$stateId\")"
-    done
+  nMembers=$(grep bioguideId $memfile | wc -l)
+  echo "$memfile out of $nMemFiles"
+  memIdx=0
+  while [ $memIdx -lt $nMembers ]; do
+    curMember=$(cat $memfile | jq ".members[$memIdx]")
+    bioguide=$(echo $curMember | jq '.member.bioguideId' | tr -d '"')
+    name=$(echo $curMember | jq '.member.name' | tr -d '"') 
+    lname=$(echo $name | sed -E 's/(.*),.*/\1/')
+    fname=$(echo $name | sed -E 's/.*,(.*)/\1/')
+    party=$(echo $curMember | jq '.member.party' | tr -d '"')
+    state=$(echo $curMember | jq '.member.state' | tr -d '"')
+    partyId=$(sqlite3 $DB "select id from party where desc = '$party'")
+    stateId=$(sqlite3 $DB "select id from state where fullName = '$state'")
+    if [ $FIRST -ne 0 ]; then
+      insertStmt+=", "
+    fi
+    FIRST=1
+    insertStmt+="(\"$bioguide\", \"$lname\", \"$fname\", \"$partyId\", \"$stateId\")"
+    ((++memIdx))
   done
 done
+#kill -KILL $wpid &>/dev/null
+#show_wait "Inserting congressmen data into table..." &
+#wpid=$!
+echo $insertStmt
+sqlite3 "$DB" "$insertStmt;"
 
-kill -KILL $wpid &>/dev/null
-show_wait "setting up the rest of the dynamic tables"
-wpid=$!
+#kill -KILL $wpid &>/dev/null
+#exit 0
+#show_wait "setting up the rest of the dynamic tables"
+#wpid=$!
 
 # Bill: dynamic table mapping bills to bill filepaths, metadata, stage, and (site-searchable) description or title.
 # NOTE: lastUpdateTm is in seconds since epoch.
@@ -202,4 +219,4 @@ sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS contributor (id INTEGER PRIMARY KEY, b
 sqlite3 "$DB" "DROP TABLE IF EXISTS amt" 
 sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS amt (id INTEGER PRIMARY KEY, amt INTEGER, billId INTEGER, offset INTEGER, purpose TEXT, whom TEXT)";
 
-kill -KILL $wpid &>/dev/null
+#kill -KILL $wpid &>/dev/null
