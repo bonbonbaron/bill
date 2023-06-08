@@ -31,7 +31,9 @@ function extractAmt() {
   fi
 
   #prompt="List purposes of these amounts in simple language: "
-  insertStatement="INSERT INTO amt (amt, billId, offset) VALUES "
+  insertStatement="
+    DELETE FROM amt WHERE billId = \"$billId\";
+    INSERT INTO amt (amt, billId, offset) VALUES "
   FIRST=0
   for i in ${input[*]}; do
     if [ $FIRST -ne 0 ]; then

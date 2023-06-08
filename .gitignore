@@ -9,3 +9,4 @@ db/
 .pkgs/
 temp
 .last-datetime
+out

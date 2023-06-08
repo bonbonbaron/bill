@@ -146,9 +146,6 @@ for f in $(ls $PKG_URL_DIR); do
       createdTm=$(jq '.dateIssued' $pkgDoc | date +%s | tr -d '"')
       #lastUpdatedTm=$(jq '.lastModified' $pkgDoc | date +%s | tr -d '"')  not accurate in the database sense
       lastUpdatedTm=$(date +%s)
-      if [ $lastUpdatedTm -le $(date -d "00:00:00" +%s) ]; then
-        echo -e "\t\tlast update LESS----------------------------------------"
-      fi
       CONGRESS=$(jq  '.congress' $pkgDoc | tr -d '"')
       name=$CONGRESS$_type$_billNumber  # CONGRESS number isn't technically part of "bill slug", but it'll keep it unique across congresses.
       filepath="$REPO/db/$CONGRESS/$name"
@@ -162,10 +159,16 @@ for f in $(ls $PKG_URL_DIR); do
         fi
       fi
 
+      # TODO move this to its own file/function
       # Bill table insertion
-      printf "%s\n" "$name - $desc"
+      printf "%s\n" "$(date +%Y-%m-%d_%H:%M:%S)   $name ($stage) - $desc"
+      NEWDATETIME=$(date +%Y-%m-%dT%H%%3A%M%%3A%SZ)
+      # sqlite3 apparently doesn't support merge statements, so we'll delete and insert instead.
       execStr="
-      sqlite3 '$DB' 'INSERT INTO bill (
+      sqlite3 '$DB' '
+      DELETE FROM bill
+        WHERE name = \"$name\";
+      INSERT INTO bill (
         name,
         desc,
         nUpdates,
@@ -185,8 +188,9 @@ for f in $(ls $PKG_URL_DIR); do
         $lastUpdatedTm
       );'"
       #echo $execStr  # good for debugging
-      eval $execStr 2>/dev/null
+      eval $execStr 
 
+      # TODO move this to its own file/function
       # Contributor table insertion
       nMembers=$(jq '.members | length' $pkgDoc)
       i=0
