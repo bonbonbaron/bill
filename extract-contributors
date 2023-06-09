@@ -7,8 +7,18 @@ function appendExecStr() {
     (select id from contributorRole where lower(desc) = lower(\"$2\"))"
 }
 
+function isBioguideUsed() {
+  for ubg in ${used_bioguides[*]}; do
+    if [ "$1" = "$ubg" ]; then
+      return 0  # 0 means true in bash
+    fi
+  done
+  return 1  # non-zero means false in bash
+}
+
 # Contributor table insertion
 function extract-contributors() {
+  declare -a used_bioguides
   # Collect bioguides of sponsors and cosponsors.
   bioguides=($(echo "$sponsors" | jq '.[]|.bioguideId' | tr -d '"'))
   coBioguides=($(echo $cosponsors | jq '.cosponsors[]|.bioguideId' | tr -d '"'))
@@ -27,6 +37,11 @@ function extract-contributors() {
   FIRST=0
   # Append sponsors to bulk-insert statement.
   for bgid in  ${bioguides[*]}; do
+    if isBioguideUsed $bgid; then
+      continue
+    else
+      used_bioguides+=($bg)
+    fi
     if [ $FIRST -ne 0 ]; then
       execStr+=" UNION SELECT "
     fi
@@ -35,6 +50,11 @@ function extract-contributors() {
   done
   # Append cosponsors to bulk-insert statement.
   for bg in  ${coBioguides[*]}; do
+    if isBioguideUsed $bgid; then
+      continue
+    else
+      used_bioguides+=($bg)
+    fi
     if [ $FIRST -ne 0 ]; then
       execStr+=" UNION SELECT "
     fi
