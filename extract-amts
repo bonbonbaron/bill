@@ -3,25 +3,17 @@
 function extract-amts() {
   if [ -z "$textUrl" ]; then
     return
-  else
-    echo -e "\n\nabout to procsess $textFp\n\n"
   fi
   # Extra dollar amounts
-  echo 1
   input=($(grep -ob -E '\$ ?[0-9,\.]+' "$textFp"))
-  echo 2
   if [ ${#input[*]} -eq 0 ]; then
-    echo 3
     if grep '\$' "$textFp"; then
       printf '\t\e[1,31Dollar signs missed\n'
       exit 1
     fi
-    echo -e '\tno dollars'
     return
   fi
-  echo 4
   billIdInDb=$(sqlite3 "$DB" "select id from bill where lower(name) = lower(\"$billId\");")
-  echo 5
 
   #prompt="List purposes of these amounts in simple language: "
   insertStatement="
@@ -29,7 +21,6 @@ function extract-amts() {
     INSERT INTO amt (amt, billId, offset) VALUES "
   FIRST=0
   for i in ${input[*]}; do
-    echo 5 and $i
     if [ $FIRST -ne 0 ]; then
       insertStatement+=", "
     fi
@@ -46,7 +37,6 @@ function extract-amts() {
       echo error
       exit 1
     fi
-    # billId: $CONGRESS$_TYPE$_BILLNUMBER
   done
 
   sqlite3 $DB "$insertStatement;"
@@ -54,6 +44,6 @@ function extract-amts() {
     echo -e "[extract-amts] Insert error:\n\n\t$insertStatement;\n"
     exit 1
   fi
-  total=$(sqlite3 $DB "select sum(amt) from amt where billId = '$billId' group by billId")
-  printf "\ttotal: \$%'21.2f\n" $total
+  total=$(sqlite3 $DB "select sum(amt) from amt where billId = '$billIdInDb' group by billId")
+  printf "\t\e[1;36mtotal: \$%'21.2f\e[0m\n" $total
 }
