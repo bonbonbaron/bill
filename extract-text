@@ -1,0 +1,67 @@
+#!/bin/bash
+
+function extract-text() {
+  nVersions=$(echo $availableTexts | jq '.textVersions|length')
+  versionIdx=0
+  if [ $nVersions -gt 0 ]; then
+    # To get the latest version, you have to find the latest date.
+    local versionIdx=0
+    local latestVersionIdx=0
+    local latestDate=0
+    while [ $versionIdx -lt $nVersions ]; do
+      curDate=$(echo $availableTexts | jq ".textVersions[$versionIdx].date" | sed 's/[TZ]/ /g' | tr -d '"')  # extract readable date
+      if [ ! "$curDate" = 'null' ]; then
+        curDate=$(date -d "$curDate" +%s)  # convert date to seconds since epoch
+        if [ $curDate -gt $latestDate ]; then
+          latestDate=$curDate
+          latestVersionIdx=$versionIdx
+        fi
+      fi
+      ((++versionIdx))
+    done
+    # If we found any non-null dates, we have a version.
+    if [ $latestDate -gt 0 ]; then
+      # Get that version's available formats.
+      nFormats=$(echo $availableTexts | jq ".textVersions[$latestVersionIdx].formats|length")
+      local formatIdx=0
+      xmlUrl=""
+      txtUrl=""
+      pdfUrl=""
+      # Order isn't guaranteed afaik, so gather all URLs and pick the preferred one after.
+      while [ $formatIdx -lt $nFormats ]; do
+        url=$(echo $availableTexts | jq ".textVersions[$latestVersionIdx].formats[$formatIdx].url" | tr -d '"')
+        if [ ! -z "$url" ]; then
+          extension="${url##*.}"
+          if [ $extension = "xml" ]; then
+            xmlUrl=$url
+          elif [ $extension = 'htm' ]; then
+            txtUrl=$url
+          elif [ $extension = 'pdf' ]; then
+            pdfUrl=$url
+          else
+            echo "unexpected extension: $extension"
+          fi
+        fi
+        ((++formatIdx))
+      done
+      # Pick the first available URL by order of preference.
+      if [ ! -z "$xmlUrl" ]; then
+        textUrl=$xmlUrl
+        extension="xml"
+      elif [ ! -z "$txtUrl" ]; then
+        textUrl=$txtUrl
+        extension="txt"
+      elif [ ! -z "$pdfUrl" ]; then
+        textUrl=$pdfUrl
+        extension="pdf"
+      fi
+      # If we found one, then download it.
+      if [ ! -z "textUrl" ]; then
+        DIR="$REPO/db/$congress/"
+        mkdir -p $DIR
+        textFp="$DIR/$billId.$extension"
+        curl $BE_QUIET -X 'GET' "$textUrl?$KEY" > $textFp
+      fi
+    fi
+  fi
+}

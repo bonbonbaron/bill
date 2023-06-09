@@ -1,36 +1,42 @@
 #!/bin/bash
 
-function getVal {
-  grep $1 $2 | awk '{print $2}' | tr -d '",'
-}
-
-function getVals {
-  IFS='
-  '
-  echo "$(getVal $1 $2)"
-}
-
 # Basic vars
 REPO=$(readlink -f $(dirname $0)) # Force bill directory to exist.
+if [ ! -e $REPO/.env ]; then
+  echo -e "You need to put a .env file into $REPO first. Populate that file like so:\n\nCONGRESS_KEY=<your API key>\n"
+  exit 1
+fi
 PKG_URL_DIR=$REPO/.pkgs/
+if [ ! -d $PKG_URL_DIR ]; then
+  mkdir -p $PKG_URL_DIR
+fi
+rm -f $PKG_URL_DIR/*
 DB=$REPO/.db
 PRVDATETIME_FILE=$REPO/.last-datetime
 BE_QUIET=
+counter=0
 
+# Source the functions we use
+source $REPO/extract-amts
+source $REPO/extract-bill
+source $REPO/extract-contributors
+source $REPO/extract-text
+source $REPO/.env
+KEY="api_key=$CONGRESS_KEY"
+
+# Options
 while getopts 'rs' opt; do
   case $opt in
     r) # Empty out all the dynamic tables.
-      sqlite3 $DB 'delete from bill; delete from amt; delete from contributor;';;
+      sqlite3 $DB 'delete from bill; delete from amt; delete from contributor;'
+      rm -rf $REPO/db/
+      ;;
     s) # Silence curl.
       BE_QUIET=-s;;
   esac
 done
 
-# First draw the old timestamp out of the old timestamp file. 
-# We store timestamps in URL-friendly format, i.e. %3A instead of ':'.
-# We're going to get all the bills updated since this time.
-# Then store current timestamp in "last timestamp" file to use next time.
-
+# Timestamp range of bills to collect
 NEWDATETIME=$(date -u +%Y-%m-%dT%H%%3A%M%%3A%SZ)
 PRVDATETIME=
 if [ -e $PRVDATETIME_FILE ]; then
@@ -42,56 +48,20 @@ else
 fi
 
 # For debugging
-PRVDATETIME="2023-06-09T00%3A00%3A00Z"
-NEWDATETIME="2023-06-09T05%3A00%3A00Z"
+PRVDATETIME="2023-06-09T03%3A00%3A00Z"
+NEWDATETIME="2023-06-09T05%3A00%3A59Z"
 
-# Key
-if [ ! -e $REPO/.env ]; then
-  echo -e "You need to put a .env file into $SRC_DIR first. Populate that file like so:\n\nCONGRESS_KEY=<your API key>\n"
-  exit 1
-fi
-
-if [ ! -d $PKG_URL_DIR ]; then
-  mkdir -p $PKG_URL_DIR
-fi
-
-source $REPO/show_wait
-source $REPO/extract-amts
-source $REPO/.env
-KEY="api_key=$CONGRESS_KEY"
-
-# TODO make this an option.
-TMP=$REPO/.tmp
-
-rm -f $TMP
-touch $TMP
-
+# Local functions
 function procBillPkg() {
-  echo "${@}" | jq '.' >> $TMP
-  CONGRESS=$(jq  '.congress'  $TMP| tr -d '"')
-  _type=$(jq '.billType'  $TMP | tr -d '"')
-  _billNumber=$(jq '.billNumber'  $TMP | tr -d '"')
-  name=$CONGRESS$_type$_billNumber  # CONGRESS number isn't technically part of "bill slug", but it'll keep it unique across congresses.
-  mkdir -p $REPO/db/$CONGRESS/$name/.pkg
-  mv $TMP $PKG_URL_DIR/url-pkg-$counter
-  ((counter += 1))
+  counter=$(ls $PKG_URL_DIR | wc -l)
+  echo "${@}" | jq '.' > $PKG_URL_DIR/url-pkg-$counter
 }
 
-
-# Store the first page of results in database.
-counter=0
-
+# Collect bills' summaries
 # Get this congress's first page of 100 bill summaries. (Time format in URL is yyyy-mm-dd'T'HH:mm:ss'Z'.)
 echo -e "\nRunning from $PRVDATETIME to $NEWDATETIME.\n" | sed 's/%3A/:/g; s/[TZ]/ /g'
-
 todays_bill_activity=$(curl $BE_QUIET -X 'GET' "https://api.congress.gov/v3/bill/?fromDateTime=$PRVDATETIME&toDateTime=$NEWDATETIME&limit=250&offsetMark=0&congress=118&$KEY")
-#todays_bill_activity=$(curl -X 'GET' "https://api.congress.gov/v3/bill/?fromDateTime=2023-06-06T00%3A00%3A00Z&limit=250&offsetMark=0&congress=118&$KEY")
-
-echo done with first curl
 procBillPkg $todays_bill_activity
-
-echo $todays_bill_activity > out
-
 # If there are anymore pages beyond the first, retrieve and store them in the databse as well.
 nextPage=$(echo "$todays_bill_activity" | jq '.nextPage' | sed 's/"//g')
 while [ ! ${nextPage} = null ]; do
@@ -101,143 +71,39 @@ while [ ! ${nextPage} = null ]; do
   nextPage=$(echo $todays_bill_activity | jq '.nextPage' | sed 's/"//g')
 done
 
-echo done with other curls
-rm -f $TMP
-
-# For all bill activities today...
-# TODO: Am I crazy of did the packageId and packageLink tags disappear?
-#       Or are they only available during the day?
+# For all batches of bills...
 for f in $(ls $PKG_URL_DIR); do
-  echo cur file: $f
-  # Make an array of IDs
-  pkgIds=($(getVals packageId "${PKG_URL_DIR}/$f"))
-  echo pkg ids: ${pkdIds[*]}
-  # Make a corresponding array of URLs
-  pkgUrls=($(getVals packageLink "${PKG_URL_DIR}/$f"))
-  echo pkg urls: ${pkdUrls[*]}
-  # Make sure we have the same number of package URLs as we do package IDs. They need to correspond perfectly.
-  if [ ${#pkgIds[*]} -ne ${#pkgUrls[*]} ]; then
-    echo "There's supposed to be the same number of package IDs as package URLs in $f. Is it corrupted? Exitting..."
-    exit
-  fi
-  # For each ID-URL mapping in the current batch...
-  counter=0
-  maxCounter=${#pkgIds[*]}
-  while [ $counter -lt $maxCounter ]; do
-    echo coutner is $counter
-    id=${pkgIds[$counter]}
-    pkgUrl=${pkgUrls[$counter]}
-    #show_wait "Processing bill $id..." 2>/dev/null &
-    wpid=$!
-    # I append the counter to the package ID *just in case* there's multiple activity on the same document.
-    # Don't re-download pre-existing text docs.
-    formattedCounter=$(printf '%03d' $counter)
-    # Only curl the package if we haven't done so for this one yet.
-    curl $BE_QUIET "${pkgUrl}?$KEY" > $TMP
-    _billNumber=$(jq '.billNumber' $TMP | tr -d '"')
-    _type=$(jq '.billType' $TMP | tr -d '"')
-    CONGRESS=$(jq  '.congress' $TMP | tr -d '"')
-    name=$CONGRESS$_type$_billNumber  # CONGRESS number isn't technically part of "bill slug", but it'll keep it unique across congresses.
-    pkgPath="$REPO/db/$CONGRESS/$name/.pkg"
-    mkdir -p $pkgPath
-    pkgDoc=$pkgPath/pkg-$name
-    mv $TMP $pkgDoc
-    # TODO experiment with xml link instead of txt for mobile readability to determine best path.
-    #txtUrl=$(getVal txtLink $pkgDoc)
-    txtUrl=$(getVal xmlLink $pkgDoc)
-    txtDoc=$(readlink -f $pkgPath/../$name)
-    curl $BE_QUIET $txtUrl?$KEY > "$txtDoc"
-    if [ $? -eq 0 -a -e $txtDoc ]; then
-      # First, extract all the information you need about this bill.
-      # name TEXT <-- grep out the collecion code, its trailing hyphen, congress, and the billVersion
-
-      _type=$(jq '.billType' $pkgDoc | tr -d '"')
-      _version=$(jq '.billVersion' $pkgDoc | tr -d '"')
-      _collectionCode=$(jq '.collectionCode' $pkgDoc | tr -d '"')
-      _billNumber=$(jq '.billNumber' $pkgDoc | tr -d '"')
-      desc=$(jq '.shortTitle[0].title' $pkgDoc | tr -d '"')
-      if [ "$desc" = "null" ]; then
-        desc=$(jq '.title' $pkgDoc | tr -d '"')
-      fi
-      nUpdates=0 #TODO
-      nPages=$(jq '.pages' $pkgDoc | tr -d '"')
-      stage=$(jq '.billVersion' $pkgDoc | tr -d '"')
-      createdTm=$(jq '.dateIssued' $pkgDoc | date -u +%s | tr -d '"')
-      #lastUpdatedTm=$(jq '.lastModified' $pkgDoc | date -u +%s | tr -d '"')  not accurate in the database sense
-      # Database's update timestamp
-      dbUpdatedTm=$(date -u +%s)
-      latestAction=$(jq '.bill.latestAction.text' $pkgDoc | tr -d '"')
-      # Bill's update timestamp
-      latestActionDt=$(date -d $(jq '.bill.latestAction.actionDate' $pkgDoc | tr '"') +%s)
-      CONGRESS=$(jq  '.congress' $pkgDoc | tr -d '"')
-      name=$CONGRESS$_type$_billNumber  # CONGRESS number isn't technically part of "bill slug", but it'll keep it unique across congresses.
-      filepath="$REPO/db/$CONGRESS/$name"
-
-      if [ ! -d $filepath ]; then
-        echo "creating filepath $filepath"
-        mkdir -p $filepath
-        if [ $? -ne 0 ]; then
-          echo "error making directory $filepath. Exitting..."
-          exit 1
-        fi
-      fi
-
-      # TODO move this to its own file/function
-      # Bill table insertion
-      printf "%s\n" "$(jq '.bill.latestAction.actionDate' $pkgDoc | tr '"')   $name ($stage) - $desc"
-      # sqlite3 apparently doesn't support merge statements, so we'll delete and insert instead.
-      execStr="
-      sqlite3 '$DB' '
-      DELETE FROM bill
-        WHERE name = \"$name\";
-      INSERT INTO bill (
-        name,
-        desc,
-        nUpdates,
-        nPages,
-        stageId,
-        filepath,
-        createdTm,
-        lastUpdatedTm)
-      VALUES (
-        \"$name\",
-        \"$desc\",
-        $nUpdates,
-        $nPages,
-        (select id from stage where lower(symbol) = lower(\"$stage\")),
-        \"$txtDoc\",
-        $createdTm,
-        $lastUpdatedTm
-      );'"
-      #echo $execStr  # good for debugging
-      eval $execStr 
-
-      # TODO move this to its own file/function
-      # Contributor table insertion
-      nMembers=$(jq '.members | length' $pkgDoc)
-      i=0
-      while [ $i -lt $nMembers ]; do
-        bgid=$(jq ".members[$i].bioGuideId" $pkgDoc | tr -d '"')
-        role=$(jq ".members[$i].role" $pkgDoc | tr -d '"')
-        execStr="
-        sqlite3 '$DB' 'INSERT INTO contributor (
-          billId,
-          roleId,
-          congressmanId)
-        VALUES (
-          (select id from bill where lower(name) = lower(\"$name\")),
-          (select id from congressman where lower(bioguide) = lower(\"$bgid\")),
-          (select id from contributorRole where lower(desc) = lower(\"$role\")))';"
-        
-        eval $execStr #2>/dev/null
-        ((++i))
-      done
-
-      # Amount table insertion
-      extractAmt $txtDoc
-    fi
-    ((counter++))
-    #kill -KILL $wpid 
+  billSummaryFp="$PKG_URL_DIR/$f"
+  billIdx=0
+  nBills=$(jq '.pagination.count' $billSummaryFp | tr -d '"')
+  # For each bill in the current batch...
+  while [ $billIdx -lt $nBills ]; do
+    # Bill (from bill endpoint)
+    bill=$(jq ".bills[$billIdx]" $billSummaryFp)
+    congress=$(echo $bill | jq  '.congress' | tr -d '"')
+    chamber=$(echo $bill | jq  '.type' | tr -d '"')
+    billNumber=$(echo $bill | jq '.number' | tr -d '"')
+    billId="$congress$chamber$billNumber" 
+    title=$(echo $bill | jq ".title" | tr -d '"')
+    latestAction=$(echo $bill | jq '.latestAction.text' | tr -d '"')
+    latestActionDt=$(date -d $(echo $bill | jq '.latestAction.actionDate' | tr -d '"') +%s)
+    nActions=$(echo $bill | jq '.actions.count' | tr -d '"')
+    updateTimestamp=$(echo $bill | jq '.updateDateIncludingText' | tr -d '"')
+    updateSecondsSinceEpoch=$(date -d $(echo $bill | jq '.updateDateIncludingText' | tr -d '"') +%s)
+    # Details (from details endpoint)
+    details=$(curl $BE_QUIET -X 'GET' "$(echo $bill | jq '.url' | tr -d '"')&$KEY")
+    sponsors=$(echo $details | jq '.bill.sponsors' 2>/dev/null)
+    cosponsors=$(curl $BE_QUIET "$(echo $details | jq '.bill.cosponsors.url' | tr -d '"')&$KEY")
+    # Text (from text endpoint)
+    textUrl=
+    textFp=
+    availableTexts=$(curl $BE_QUIET -X 'GET' "https://api.congress.gov/v3/bill/$congress/$chamber/$billNumber/text?&$KEY")
+    nAvailableTexts=$(echo $availableTexts | jq '.pagination.count' | tr -d '"')
+    # Extract relevant data into database and files
+    extract-text
+    extract-bill
+    extract-contributors
+    extract-amts 
+    ((++billIdx))
   done
 done
-#kill -KILL $wpid 

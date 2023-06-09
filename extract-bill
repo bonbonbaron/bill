@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Bill table insertion
+# Parameters: name, desc, nUpdates, nPages, fp, createdTime, updatedTime
+function extract-bill() {
+  printf "\e[1;31m$updateTimestamp  \e[1;32m$billId\e[0m - $title\n"
+  local lastUpdateTm=$(sqlite3 "$DB" "select lastUpdateTm from bill where name='$billId'")
+  if [ -z "$lastUpdateTm" ]; then
+    lastUpdateTm=0
+  fi
+  if [ $lastUpdateTm -lt $updateSecondsSinceEpoch ]; then
+    # sqlite3 apparently doesn't support merge statements, so we'll delete and insert instead.
+    execStr="
+    sqlite3 '$DB' '
+    DELETE FROM bill
+      WHERE name = \"$billId\";
+    INSERT INTO bill (
+      name,
+      desc,
+      lastUpdateTm,
+      lastAction,
+      lastActionDt,
+      filepath)
+    VALUES (
+      \"$(echo $billId | tr -d "'")\",
+      \"$(echo $title | tr -d "'")\",
+      $updateSecondsSinceEpoch,
+      \"$(echo $latestAction | tr -d "'")\",
+      $latestActionDt,
+      \"$(echo $textFp | tr -d "'")\"
+    );'"
+    eval $execStr 
+    if [ $? -ne 0 ]; then
+      echo -e "Something went wrong with this sql insert statement. Debug it:\n\n\t$execStr"
+      exit 1
+    fi
+  fi
+}
+

@@ -119,8 +119,8 @@ if false; then
     # Role: static table mapping integers to roles
     sqlite3 "$DB" "DROP TABLE IF EXISTS contributorRole" 
     sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS contributorRole (id INTEGER PRIMARY KEY, desc TEXT UNIQUE)"
-    sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('Sponsor')"
-    sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('Co-Sponsor')"
+    sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('SPONSOR')"
+    sqlite3 "$DB" "INSERT INTO contributorRole (desc) VALUES ('COSPONSOR')"
 
     #kill -KILL $wpid &>/dev/null
 
@@ -161,55 +161,55 @@ if false; then
     done
 
     #kill -KILL $wpid &>/dev/null
-fi # if false
 
-#show_wait "Generating congressmen insert statement..." &
-#wpid=$!
-# Congressmen- semi-static table mapping integers to congressmen, their bioguides, parties, states, and names
-sqlite3 "$DB" "DROP TABLE IF EXISTS congressman" 
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS congressman (id INTEGER PRIMARY KEY, bioguide TEXT UNIQUE, lname TEXT, fname TEXT, partyId INTEGER, stateId INTEGER);" 
+  #show_wait "Generating congressmen insert statement..." &
+  #wpid=$!
+  # Congressmen- semi-static table mapping integers to congressmen, their bioguides, parties, states, and names
+  sqlite3 "$DB" "DROP TABLE IF EXISTS congressman" 
+  sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS congressman (id INTEGER PRIMARY KEY, bioguide TEXT UNIQUE, lname TEXT, fname TEXT, partyId INTEGER, stateId INTEGER);" 
 
-# Iterate over all congressmen in each member file to put them into database.
-insertStmt="insert into congressman (bioguide, lname, fname, partyId, stateId) values "
-FIRST=0
-nMemFiles=$(ls $MEMDIR/mem* | wc -l)
-for memfile in $(ls $MEMDIR/mem*); do
-  nMembers=$(grep bioguideId $memfile | wc -l)
-  echo "$memfile out of $nMemFiles"
-  memIdx=0
-  while [ $memIdx -lt $nMembers ]; do
-    curMember=$(cat $memfile | jq ".members[$memIdx]")
-    bioguide=$(echo $curMember | jq '.member.bioguideId' | tr -d '"')
-    name=$(echo $curMember | jq '.member.name' | tr -d '"') 
-    lname=$(echo $name | sed -E 's/(.*),.*/\1/')
-    fname=$(echo $name | sed -E 's/.*,(.*)/\1/')
-    party=$(echo $curMember | jq '.member.party' | tr -d '"')
-    state=$(echo $curMember | jq '.member.state' | tr -d '"')
-    partyId=$(sqlite3 $DB "select id from party where desc = '$party'")
-    stateId=$(sqlite3 $DB "select id from state where fullName = '$state'")
-    if [ $FIRST -ne 0 ]; then
-      insertStmt+=", "
-    fi
-    FIRST=1
-    insertStmt+="(\"$bioguide\", \"$lname\", \"$fname\", \"$partyId\", \"$stateId\")"
-    ((++memIdx))
+  # Iterate over all congressmen in each member file to put them into database.
+  insertStmt="insert into congressman (bioguide, lname, fname, partyId, stateId) values "
+  FIRST=0
+  nMemFiles=$(ls $MEMDIR/mem* | wc -l)
+  for memfile in $(ls $MEMDIR/mem*); do
+    nMembers=$(grep bioguideId $memfile | wc -l)
+    echo "$memfile out of $nMemFiles"
+    memIdx=0
+    while [ $memIdx -lt $nMembers ]; do
+      curMember=$(cat $memfile | jq ".members[$memIdx]")
+      bioguide=$(echo $curMember | jq '.member.bioguideId' | tr -d '"')
+      name=$(echo $curMember | jq '.member.name' | tr -d '"') 
+      lname=$(echo $name | sed -E 's/(.*),.*/\1/')
+      fname=$(echo $name | sed -E 's/.*,(.*)/\1/')
+      party=$(echo $curMember | jq '.member.party' | tr -d '"')
+      state=$(echo $curMember | jq '.member.state' | tr -d '"')
+      partyId=$(sqlite3 $DB "select id from party where desc = '$party'")
+      stateId=$(sqlite3 $DB "select id from state where fullName = '$state'")
+      if [ $FIRST -ne 0 ]; then
+        insertStmt+=", "
+      fi
+      FIRST=1
+      insertStmt+="(\"$bioguide\", \"$lname\", \"$fname\", \"$partyId\", \"$stateId\")"
+      ((++memIdx))
+    done
   done
-done
-#kill -KILL $wpid &>/dev/null
-#show_wait "Inserting congressmen data into table..." &
-#wpid=$!
-echo $insertStmt
-sqlite3 "$DB" "$insertStmt;"
+  #kill -KILL $wpid &>/dev/null
+  #show_wait "Inserting congressmen data into table..." &
+  #wpid=$!
+  echo $insertStmt
+  sqlite3 "$DB" "$insertStmt;"
 
-#kill -KILL $wpid &>/dev/null
-#exit 0
-#show_wait "setting up the rest of the dynamic tables"
-#wpid=$!
+  #kill -KILL $wpid &>/dev/null
+  #exit 0
+  #show_wait "setting up the rest of the dynamic tables"
+  #wpid=$!
+fi # if false
 
 # Bill: dynamic table mapping bills to bill filepaths, metadata, stage, and (site-searchable) description or title.
 # NOTE: lastUpdateTm is in seconds since epoch.
 sqlite3 "$DB" "DROP TABLE IF EXISTS bill" 
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS bill (id INTEGER PRIMARY KEY, name TEXT UNIQUE, desc TEXT, nUpdates INTEGER, nPages INTEGER, stageId INTEGER, createdTm INTEGER, lastUpdatedTm INTEGER, filepath TEXT);" 
+sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS bill (id INTEGER PRIMARY KEY, name TEXT UNIQUE, desc TEXT, lastUpdateTm INTEGER, lastAction TEXT, lastActionDt INTEGER, filepath TEXT);" 
 
 # Contributor: dynamic table mapping contributors and their roles to each bill
 sqlite3 "$DB" "DROP TABLE IF EXISTS contributor" 

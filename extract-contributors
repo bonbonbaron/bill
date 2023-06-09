@@ -1,0 +1,52 @@
+#!/bin/bash
+
+function appendExecStr() {
+  execStr+="
+    (select id from bill where lower(name) = lower(\"$billId\")),
+    (select id from congressman where lower(bioguide) = lower(\"$1\")),
+    (select id from contributorRole where lower(desc) = lower(\"$2\"))"
+}
+
+# Contributor table insertion
+function extract-contributors() {
+  # Collect bioguides of sponsors and cosponsors.
+  bioguides=($(echo "$sponsors" | jq '.[]|.bioguideId' | tr -d '"'))
+  coBioguides=($(echo $cosponsors | jq '.cosponsors[]|.bioguideId' | tr -d '"'))
+  # Leave if there aren't any contributors.
+  if [ ${#bioguides[*]} -eq 0 -a ${#coBioguides[*]} -eq 0 ]; then
+    return
+  fi
+  # Initialize bulk-insert statement.
+  execStr="
+    sqlite3 '$DB' 'INSERT INTO contributor (
+      billId,
+      roleId,
+      congressmanId)
+    SELECT 
+  "
+  FIRST=0
+  # Append sponsors to bulk-insert statement.
+  for bgid in  ${bioguides[*]}; do
+    if [ $FIRST -ne 0 ]; then
+      execStr+=" UNION SELECT "
+    fi
+    FIRST=1
+    appendExecStr $bgid "SPONSOR"
+  done
+  # Append cosponsors to bulk-insert statement.
+  for bg in  ${coBioguides[*]}; do
+    if [ $FIRST -ne 0 ]; then
+      execStr+=" UNION SELECT "
+    fi
+    FIRST=1
+    appendExecStr $bgid "COSPONSOR"
+  done
+  execStr+=";'"
+  # Execute bulk-insert.
+  eval $execStr 
+  if [ $? -ne 0 ]; then
+    echo -e "\n[extract-contributors] insert error:\n\n\t$execStr"
+    exit 1
+  fi
+}
+
