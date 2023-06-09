@@ -107,13 +107,16 @@ for f in $(ls $PKG_URL_DIR); do
   done
 done
 
-# Move new files to the website's storehouse.
-prvTimeSecsSinceEpoch=$(date -d "$(echo $PRVDATETIME | sed 's/[TZ]/ /g; s/%3A/:/g')" +%s)
-newFiles=($(sqlite3 "$DB" "select filepath from bill where lastUpdateTm > $prvTimeSecsSinceEpoch;"))
-sudo mkdir -p /var/www/bucksinbills.com/congress/$congress/bills/
-for nf in ${newFiles[*]}; do
-  sudo cp $nf /var/www/bucksnbills.com/congress/$congress/bills/$(basename $nf)
-done
+# Move new files to the website's storehouse... ONLY if we have anything.
+# TODO support multiple congresses
+if [ ! -z "$congress" ]; then
+  prvTimeSecsSinceEpoch=$(date -d "$(echo $PRVDATETIME | sed 's/[TZ]/ /g; s/%3A/:/g')" +%s)
+  newFiles=($(sqlite3 "$DB" "select filepath from bill where lastUpdateTm > $prvTimeSecsSinceEpoch;"))
+  sudo mkdir -p /var/www/bucksinbills.com/congress/$congress/bills/
+  for nf in ${newFiles[*]}; do
+    sudo cp $nf /var/www/bucksnbills.com/congress/$congress/bills/$(basename $nf)
+  done
+fi
 
 # Waiting till now to store the new time for the next run allows debugging broken reruns.
 echo $NEWDATETIME > $PRVDATETIME_FILE
