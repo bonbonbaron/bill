@@ -41,7 +41,6 @@ NEWDATETIME=$(date -u +%Y-%m-%dT%H%%3A%M%%3A%SZ)
 PRVDATETIME=
 if [ -e $PRVDATETIME_FILE ]; then
   PRVDATETIME=$(cat $PRVDATETIME_FILE)
-  echo $NEWDATETIME > $PRVDATETIME_FILE
 else
   PRVDATETIME=$(date -u +%Y-%m-%dT00%%3A00%%3A00Z)
   echo $PRVDATETIME > $PRVDATETIME_FILE
@@ -59,7 +58,7 @@ function procBillPkg() {
 
 # Collect bills' summaries
 # Get this congress's first page of 100 bill summaries. (Time format in URL is yyyy-mm-dd'T'HH:mm:ss'Z'.)
-echo -e "\nRunning from $PRVDATETIME to $NEWDATETIME.\n" | sed 's/%3A/:/g; s/[TZ]/ /g'
+echo -e "\nRunning from $PRVDATETIME to $NEWDATETIME\n" | sed 's/%3A/:/g; s/[TZ]/ /g'
 todays_bill_activity=$(curl $BE_QUIET -X 'GET' "https://api.congress.gov/v3/bill/?fromDateTime=$PRVDATETIME&toDateTime=$NEWDATETIME&limit=250&offsetMark=0&congress=118&$KEY")
 procBillPkg $todays_bill_activity
 # If there are anymore pages beyond the first, retrieve and store them in the databse as well.
@@ -107,3 +106,15 @@ for f in $(ls $PKG_URL_DIR); do
     ((++billIdx))
   done
 done
+
+# Move new files to the website's storehouse.
+prvTimeSecsSinceEpoch=$(date -d "$(echo $PRVDATETIME | sed 's/[TZ]/ /g; s/%3A/:/g')" +%s)
+newFiles=($(sqlite3 "$DB" "select filepath from bill where lastUpdateTm > $prvTimeSecsSinceEpoch;"))
+sudo mkdir -p /var/www/bucksinbills.com/congress/$congress/bills/
+for nf in ${newFiles[*]}; do
+  sudo cp $nf /var/www/bucksnbills.com/congress/$congress/bills/$(basename $nf)
+done
+
+# Waiting till now to store the new time for the next run allows debugging broken reruns.
+echo $NEWDATETIME > $PRVDATETIME_FILE
+echo -e "Done.\n"
