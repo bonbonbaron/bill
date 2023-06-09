@@ -10,28 +10,41 @@ function getVals {
   echo "$(getVal $1 $2)"
 }
 
-# Force bill directory to exist.
-REPO=$(readlink -f $(dirname $0))
+# Basic vars
+REPO=$(readlink -f $(dirname $0)) # Force bill directory to exist.
+PKG_URL_DIR=$REPO/.pkgs/
+DB=$REPO/.db
 PRVDATETIME_FILE=$REPO/.last-datetime
+BE_QUIET=
+
+while getopts 'rs' opt; do
+  case $opt in
+    r) # Empty out all the dynamic tables.
+      sqlite3 $DB 'delete from bill; delete from amt; delete from contributor;';;
+    s) # Silence curl.
+      BE_QUIET=-s;;
+  esac
+done
 
 # First draw the old timestamp out of the old timestamp file. 
 # We store timestamps in URL-friendly format, i.e. %3A instead of ':'.
 # We're going to get all the bills updated since this time.
 # Then store current timestamp in "last timestamp" file to use next time.
 
-NEWDATETIME=$(date +%Y-%m-%dT%H%%3A%M%%3A%SZ)
+NEWDATETIME=$(date -u +%Y-%m-%dT%H%%3A%M%%3A%SZ)
 PRVDATETIME=
 if [ -e $PRVDATETIME_FILE ]; then
   PRVDATETIME=$(cat $PRVDATETIME_FILE)
   echo $NEWDATETIME > $PRVDATETIME_FILE
 else
-  PRVDATETIME=$(date +%Y-%m-%dT00%%3A00%%3A00Z)
+  PRVDATETIME=$(date -u +%Y-%m-%dT00%%3A00%%3A00Z)
   echo $PRVDATETIME > $PRVDATETIME_FILE
 fi
 
-# Basic vars
-PKG_URL_DIR=$REPO/.pkgs/
-DB=$REPO/.db
+# For debugging
+PRVDATETIME="2023-06-09T00%3A00%3A00Z"
+NEWDATETIME="2023-06-09T05%3A00%3A00Z"
+
 # Key
 if [ ! -e $REPO/.env ]; then
   echo -e "You need to put a .env file into $SRC_DIR first. Populate that file like so:\n\nCONGRESS_KEY=<your API key>\n"
@@ -48,7 +61,6 @@ source $REPO/.env
 KEY="api_key=$CONGRESS_KEY"
 
 # TODO make this an option.
-BE_QUIET=-s
 TMP=$REPO/.tmp
 
 rm -f $TMP
@@ -70,15 +82,17 @@ function procBillPkg() {
 counter=0
 
 # Get this congress's first page of 100 bill summaries. (Time format in URL is yyyy-mm-dd'T'HH:mm:ss'Z'.)
-todays_bill_activity=$(curl $BE_QUIET -X 'GET' "https://api.congress.gov/v3/bill/?fromDateTime=$PRVDATETIME&limit=250&offsetMark=*&congress=$1&$KEY")
+echo -e "\nRunning from $PRVDATETIME to $NEWDATETIME.\n" | sed 's/%3A/:/g; s/[TZ]/ /g'
 
+todays_bill_activity=$(curl $BE_QUIET -X 'GET' "https://api.congress.gov/v3/bill/?fromDateTime=$PRVDATETIME&toDateTime=$NEWDATETIME&limit=250&offsetMark=0&congress=118&$KEY")
+#todays_bill_activity=$(curl -X 'GET' "https://api.congress.gov/v3/bill/?fromDateTime=2023-06-06T00%3A00%3A00Z&limit=250&offsetMark=0&congress=118&$KEY")
+
+echo done with first curl
 procBillPkg $todays_bill_activity
 
+echo $todays_bill_activity > out
 
 # If there are anymore pages beyond the first, retrieve and store them in the databse as well.
-#show_wait "Retrieving today's bill activity..." 2>/dev/null &
-wpid=$!
-
 nextPage=$(echo "$todays_bill_activity" | jq '.nextPage' | sed 's/"//g')
 while [ ! ${nextPage} = null ]; do
   #echo "nextPage = ${nextPage}"
@@ -87,15 +101,20 @@ while [ ! ${nextPage} = null ]; do
   nextPage=$(echo $todays_bill_activity | jq '.nextPage' | sed 's/"//g')
 done
 
-#kill -KILL $wpid 
+echo done with other curls
 rm -f $TMP
 
 # For all bill activities today...
+# TODO: Am I crazy of did the packageId and packageLink tags disappear?
+#       Or are they only available during the day?
 for f in $(ls $PKG_URL_DIR); do
+  echo cur file: $f
   # Make an array of IDs
   pkgIds=($(getVals packageId "${PKG_URL_DIR}/$f"))
+  echo pkg ids: ${pkdIds[*]}
   # Make a corresponding array of URLs
   pkgUrls=($(getVals packageLink "${PKG_URL_DIR}/$f"))
+  echo pkg urls: ${pkdUrls[*]}
   # Make sure we have the same number of package URLs as we do package IDs. They need to correspond perfectly.
   if [ ${#pkgIds[*]} -ne ${#pkgUrls[*]} ]; then
     echo "There's supposed to be the same number of package IDs as package URLs in $f. Is it corrupted? Exitting..."
@@ -105,6 +124,7 @@ for f in $(ls $PKG_URL_DIR); do
   counter=0
   maxCounter=${#pkgIds[*]}
   while [ $counter -lt $maxCounter ]; do
+    echo coutner is $counter
     id=${pkgIds[$counter]}
     pkgUrl=${pkgUrls[$counter]}
     #show_wait "Processing bill $id..." 2>/dev/null &
@@ -127,7 +147,6 @@ for f in $(ls $PKG_URL_DIR); do
     txtUrl=$(getVal xmlLink $pkgDoc)
     txtDoc=$(readlink -f $pkgPath/../$name)
     curl $BE_QUIET $txtUrl?$KEY > "$txtDoc"
-    #echo $txtDoc
     if [ $? -eq 0 -a -e $txtDoc ]; then
       # First, extract all the information you need about this bill.
       # name TEXT <-- grep out the collecion code, its trailing hyphen, congress, and the billVersion
@@ -143,9 +162,13 @@ for f in $(ls $PKG_URL_DIR); do
       nUpdates=0 #TODO
       nPages=$(jq '.pages' $pkgDoc | tr -d '"')
       stage=$(jq '.billVersion' $pkgDoc | tr -d '"')
-      createdTm=$(jq '.dateIssued' $pkgDoc | date +%s | tr -d '"')
-      #lastUpdatedTm=$(jq '.lastModified' $pkgDoc | date +%s | tr -d '"')  not accurate in the database sense
-      lastUpdatedTm=$(date +%s)
+      createdTm=$(jq '.dateIssued' $pkgDoc | date -u +%s | tr -d '"')
+      #lastUpdatedTm=$(jq '.lastModified' $pkgDoc | date -u +%s | tr -d '"')  not accurate in the database sense
+      # Database's update timestamp
+      dbUpdatedTm=$(date -u +%s)
+      latestAction=$(jq '.bill.latestAction.text' $pkgDoc | tr -d '"')
+      # Bill's update timestamp
+      latestActionDt=$(date -d $(jq '.bill.latestAction.actionDate' $pkgDoc | tr '"') +%s)
       CONGRESS=$(jq  '.congress' $pkgDoc | tr -d '"')
       name=$CONGRESS$_type$_billNumber  # CONGRESS number isn't technically part of "bill slug", but it'll keep it unique across congresses.
       filepath="$REPO/db/$CONGRESS/$name"
@@ -161,8 +184,7 @@ for f in $(ls $PKG_URL_DIR); do
 
       # TODO move this to its own file/function
       # Bill table insertion
-      printf "%s\n" "$(date +%Y-%m-%d_%H:%M:%S)   $name ($stage) - $desc"
-      NEWDATETIME=$(date +%Y-%m-%dT%H%%3A%M%%3A%SZ)
+      printf "%s\n" "$(jq '.bill.latestAction.actionDate' $pkgDoc | tr '"')   $name ($stage) - $desc"
       # sqlite3 apparently doesn't support merge statements, so we'll delete and insert instead.
       execStr="
       sqlite3 '$DB' '
