@@ -112,7 +112,7 @@ done
 if [ ! -z "$congress" ]; then
   prvTimeSecsSinceEpoch=$(date -d "$(echo $PRVDATETIME | sed 's/[TZ]/ /g; s/%3A/:/g')" +%s)
   newFiles=($(sqlite3 "$DB" "select filepath from bill where lastUpdateTm > $prvTimeSecsSinceEpoch;"))
-  sudo mkdir -p /var/www/bucksinbills.com/congress/$congress/bills/
+  sudo mkdir -p /var/www/bucksnbills.com/congress/$congress/bills/
   for nf in ${newFiles[*]}; do
     sudo cp $nf /var/www/bucksnbills.com/congress/$congress/bills/$(basename $nf)
   done
