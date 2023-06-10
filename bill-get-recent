@@ -103,20 +103,15 @@ for f in $(ls $PKG_URL_DIR); do
     extract-bill
     extract-contributors
     extract-amts 
+    # Copy file to web repository.
+    if [ ! -z "$textFp" ]; then 
+      sudo mkdir -p /var/www/bucksnbills.com/congress/$congress/bills/
+      sudo cp $textFp /var/www/bucksnbills.com/congress/$congress/bills/$(basename $nf)
+    fi
+    # Increment the index baybay
     ((++billIdx))
   done
 done
-
-# Move new files to the website's storehouse... ONLY if we have anything.
-# TODO support multiple congresses
-if [ ! -z "$congress" ]; then
-  prvTimeSecsSinceEpoch=$(date -d "$(echo $PRVDATETIME | sed 's/[TZ]/ /g; s/%3A/:/g')" +%s)
-  newFiles=($(sqlite3 "$DB" "select filepath from bill where lastUpdateTm > $prvTimeSecsSinceEpoch;"))
-  sudo mkdir -p /var/www/bucksnbills.com/congress/$congress/bills/
-  for nf in ${newFiles[*]}; do
-    sudo cp $nf /var/www/bucksnbills.com/congress/$congress/bills/$(basename $nf)
-  done
-fi
 
 # Waiting till now to store the new time for the next run allows debugging broken reruns.
 echo $NEWDATETIME > $PRVDATETIME_FILE
