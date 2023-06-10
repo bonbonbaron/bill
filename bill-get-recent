@@ -106,7 +106,7 @@ for f in $(ls $PKG_URL_DIR); do
     # Copy file to web repository.
     if [ ! -z "$textFp" ]; then 
       sudo mkdir -p /var/www/bucksnbills.com/congress/$congress/bills/
-      sudo cp $textFp /var/www/bucksnbills.com/congress/$congress/bills/$(basename $nf)
+      sudo cp $textFp /var/www/bucksnbills.com/congress/$congress/bills/$(basename $textFp)
     fi
     # Increment the index baybay
     ((++billIdx))
