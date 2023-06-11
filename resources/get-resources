@@ -1,0 +1,1 @@
+wget -r -np -A "*.xsl" "https://www.govinfo.gov/bulkdata/BILLS/resources"

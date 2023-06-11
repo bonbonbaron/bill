@@ -69,6 +69,7 @@
      $results = $db->query("
 	select ifnull(sum(a.amt), 0.00) as amt, 
 		b.desc as desc, 
+		b.filepath as filepath, 
 		b.name
 	from amt a, bill b 
 	where b.id = a.billId 
@@ -78,6 +79,7 @@
 
 	select 0.00 as amt, 
 		b.desc, 
+		b.filepath as filepath, 
 		b.name
 	from bill b 
 	where b.id not in (select distinct billId from amt) 
@@ -93,7 +95,12 @@
 	 $amt = shortenAmount($row['amt']);
          echo "<tr>";
          echo "<td class=\"amount\">\$$amt</td>";
-         echo "<td class=\"bill_name\"><a href=\"//192.168.1.72:81/congress/118/bill/{$row['name']}.xml\" class=\"row-link\">{$row['desc']}</a></td>";
+	 if ($row['filepath'] == "") {
+           echo "<td class=\"bill_name\">{$row['desc']}</a></td>";
+	 }
+	 else {
+           echo "<td class=\"bill_name\"><a href=\"//192.168.1.72:81/congress/118/bill/{$row['name']}.xml\" class=\"row-link\">{$row['desc']}</a></td>";
+	 }
          echo "</tr>";
        }
        echo "</table>";
