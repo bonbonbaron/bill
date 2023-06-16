@@ -83,12 +83,27 @@
              height: 80%;
            }
 
+           <style>
+             .hover-share-button {
+               position: relative;
+             }
+
+             #shareButton {
+               position: absolute;
+               left: 100%;
+               top: 0;
+               white-space: nowrap;
+             }
+          </style>
+
 				 </style>
 			</head>
 			<body class="lbexBody">
           <xsl:text disable-output-escaping="yes">
           <![CDATA[
           <div id="bodeh">
+            <button id="shareButton" style="display: none; position: fixed">Share Now</button>
+
            ]]>
            </xsl:text>
           <xsl:call-template name="prePrintWebDocument"/>
@@ -109,6 +124,7 @@
 				 <script>
 								 const prevBtn = document.getElementById("prevBtn");
 								 const nextBtn = document.getElementById("nextBtn");
+                 shareButton = document.getElementById("shareButton");
 
 								 // Wrap dollar amounts in custom tags
 								 const wrapAmounts = (element) => {
@@ -117,8 +133,16 @@
 
 								 wrapAmounts(document.body);
 
+                 let counter = 0;
+                 function abc(heck) {
+                   heck.id = "money" + counter.toString();
+                   counter = counter + 1;
+                 }
+
+
 								 let amounts = document.querySelectorAll('span.amount');
-								 let currentIndex = 0;
+                 amounts.forEach(abc);
+								 let currentIndex = -1;
                  navLocation = document.getElementById("navLocation");
                  if ( amounts.length > 0 ) {
                    navLocation.innerHTML = "1" + " / " + amounts.length.toString();
@@ -130,6 +154,9 @@
 								 // Function to jump to next/previous amount
 								 const navigateAmounts = (direction) => {
                    console.log("i'm happening");
+                   if (currentIndex >= 0 && currentIndex < amounts.length) {
+                     amounts[currentIndex].style.backgroundColor = "yellow";
+                   }
                    currentIndex += direction;
                    if (currentIndex < 0) {
                      currentIndex = amounts.length - 1;
@@ -140,10 +167,47 @@
                    navLocation.innerHTML = (currentIndex + 1).toString() + " / " + amounts.length.toString();
 
                    const target = amounts[currentIndex];
+                   target.style.backgroundColor = "#aaaaff";
                    target.scrollIntoView({ behavior: "smooth" });
 								 };
 
 								 // Attach event listeners to navigation buttons
+
+                // Okay, here's our sharing stuff:
+                // Function to show the share button on hover
+                function onMouseEnter(event) {
+                  console.log("mouse entered");
+                  const shareId = event.target.id;
+                  shareButton.setAttribute("data-share-id", shareId);
+                  event.target.classList.add("hover-share-button");
+                   //document.getElementById("shareButton").style.display = "inline-block";
+                  shareButton.style.display = "inline-block";
+                   // TODO make position of share button appear right under your mouse
+                   //shareButton.I/
+                }
+
+                // Function to hide the share button on mouse leave
+                function onMouseLeave(event) {
+                   event.target.classList.remove("hover-share-button");
+                   shareButton.style.display = "none";
+                }
+
+                // Function to handle the share functionality when the button is clicked
+                function onShareButtonClick() {
+                   const shareId = shareButton.getAttribute("data-share-id");
+                   alert("Sharing item ID: " + shareId);
+                 // Your share functionality based on shareId goes here
+                }
+
+                // Register the event listeners and assign elements to variables
+                const shareableElements = document.getElementsByClassName("shareable");
+
+                for (let i = 0; i < amounts.length; i++) {
+                   amounts[i].addEventListener("mouseenter", onMouseEnter);
+                   amounts[i].addEventListener("mouseleave", onMouseLeave);
+                }
+
+                shareButton.addEventListener("click", onShareButtonClick);
 				 </script>
 				 ]]>
 				 </xsl:text>
