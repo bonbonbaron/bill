@@ -17,10 +17,10 @@ BE_QUIET=
 counter=0
 
 # Source the functions we use
-source $REPO/extract-amts
-source $REPO/extract-bill
-source $REPO/extract-contributors
-source $REPO/extract-text
+source $REPO/scripts/extract-amts
+source $REPO/scripts/extract-bill
+source $REPO/scripts/extract-contributors
+source $REPO/scripts/extract-text
 source $REPO/.env
 KEY="api_key=$CONGRESS_KEY"
 
