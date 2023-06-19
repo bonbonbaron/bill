@@ -209,7 +209,7 @@ fi # if false
 # Bill: dynamic table mapping bills to bill filepaths, metadata, stage, and (site-searchable) description or title.
 # NOTE: lastUpdateTm is in seconds since epoch.
 sqlite3 "$DB" "DROP TABLE IF EXISTS bill" 
-sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS bill (id INTEGER PRIMARY KEY, name TEXT UNIQUE, desc TEXT, lastUpdateTm INTEGER, lastAction TEXT, lastActionDt INTEGER, filepath TEXT);" 
+sqlite3 "$DB" "CREATE TABLE IF NOT EXISTS bill (id INTEGER PRIMARY KEY, name TEXT UNIQUE, desc TEXT, lastUpdateTm INTEGER, lastAction TEXT, lastActionDt INTEGER, filepath TEXT, congress INTEGER, file_ext TEXT);" 
 
 # Contributor: dynamic table mapping contributors and their roles to each bill
 sqlite3 "$DB" "DROP TABLE IF EXISTS contributor" 

@@ -105,7 +105,10 @@ for f in $(ls $PKG_URL_DIR); do
     extract-amts 
     # Copy file to web repository.
     if [ ! -z "$textFp" ]; then 
-      sudo mkdir -p /var/www/bucksnbills.com/congress/$congress/bills/
+      if [ ! -d /var/www/bucksnbills.com/congress/$congress/bills/ ]; then
+        sudo mkdir -p /var/www/bucksnbills.com/congress/$congress/bills/
+        cp $REPO/resources/* /var/www/bucksnbills.com/congress/$congress/bills/
+      fi
       sudo cp $textFp /var/www/bucksnbills.com/congress/$congress/bills/$(basename $textFp)
     fi
     # Increment the index baybay

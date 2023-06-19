@@ -20,14 +20,16 @@ function extract-bill() {
       lastUpdateTm,
       lastAction,
       lastActionDt,
-      filepath)
+      filepath,
+      congress)
     VALUES (
       \"$(echo $billId | tr -d "'")\",
       \"$(echo $title | tr -d "'")\",
       $updateSecondsSinceEpoch,
       \"$(echo $latestAction | tr -d "'")\",
       $latestActionDt,
-      \"$(echo $textFp | tr -d "'")\"
+      \"$(echo $textFp | tr -d "'")\",
+      $congress
     );'"
     eval $execStr 
     if [ $? -ne 0 ]; then
