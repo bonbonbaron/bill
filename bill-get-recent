@@ -2,6 +2,7 @@
 
 # Basic vars
 REPO=$(readlink -f $(dirname $0)) # Force bill directory to exist.
+DATA="/var/www/bucksinbills.com/data"
 if [ ! -e $REPO/.env ]; then
   echo -e "You need to put a .env file into $REPO first. Populate that file like so:\n\nCONGRESS_KEY=<your API key>\n"
   exit 1
@@ -11,7 +12,7 @@ if [ ! -d $PKG_URL_DIR ]; then
   mkdir -p $PKG_URL_DIR
 fi
 rm -f $PKG_URL_DIR/*
-DB=$REPO/.db
+DB=$DATA/db
 PRVDATETIME_FILE=$REPO/.last-datetime
 BE_QUIET=
 counter=0
@@ -28,7 +29,7 @@ KEY="api_key=$CONGRESS_KEY"
 while getopts 'rs' opt; do
   case $opt in
     r) # Empty out all the dynamic tables.
-      sqlite3 $DB 'delete from bill; delete from amt; delete from contributor;'
+      sudo sqlite3 $DB 'delete from bill; delete from amt; delete from contributor;'
       rm -rf $REPO/db/
       ;;
     s) # Silence curl.
@@ -105,11 +106,12 @@ for f in $(ls $PKG_URL_DIR); do
     extract-amts 
     # Copy file to web repository.
     if [ ! -z "$textFp" ]; then 
-      if [ ! -d /var/www/bucksnbills.com/congress/$congress/bills/ ]; then
-        sudo mkdir -p /var/www/bucksnbills.com/congress/$congress/bills/
-        cp $REPO/resources/* /var/www/bucksnbills.com/congress/$congress/bills/
+      TGT_DIR=/var/www/bucksinbills.com/congress/$congress/bills
+      if [ ! -d $TGT_DIR ]; then
+        sudo mkdir -p $TGT_DIR
+        sudo cp $REPO/resources/* $TGT_DIR
       fi
-      sudo cp $textFp /var/www/bucksnbills.com/congress/$congress/bills/$(basename $textFp)
+      sudo cp $textFp "$TGT_DIR/$(basename $textFp)"
     fi
     # Increment the index baybay
     ((++billIdx))

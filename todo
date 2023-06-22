@@ -12,10 +12,9 @@
 \show latest action from latestAction.actionDate and latestAction.text
 \correct the datetime range to only the past hour
 \enable xml display with xsl
-make buck browser in each bill with dollar amounts highlighted throughout as grey (neutral), green (allocated), or red (cut)
-include last update date as a footnote under each bill title
-make separate tables for past seven days with date header above them, include enumeration column
-make a rectangle around the amount if it hasn't been labeled yet
+\make buck browser in each bill with dollar amounts highlighted throughout as grey (neutral), green (allocated), or red (cut)
+\include last update date as a footnote under each bill title
+\make a rectangle around the amount if it hasn't been labeled yet
 make labeler for each amount
 make color key in amounts column representing 4 different amount types (allocated, neutral, cut, unlabelled)
 make each header filterable

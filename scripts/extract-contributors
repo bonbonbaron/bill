@@ -28,7 +28,7 @@ function extract-contributors() {
   fi
   # Initialize bulk-insert statement.
   execStr="
-    sqlite3 '$DB' 'INSERT INTO contributor (
+    sudo sqlite3 '$DB' 'INSERT INTO contributor (
       billId,
       roleId,
       congressmanId)

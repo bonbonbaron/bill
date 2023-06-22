@@ -13,7 +13,7 @@ function extract-amts() {
     fi
     return
   fi
-  billIdInDb=$(sqlite3 "$DB" "select id from bill where lower(name) = lower(\"$billId\");")
+  billIdInDb=$(sudo sqlite3 "$DB" "select id from bill where lower(name) = lower(\"$billId\");")
 
   #prompt="List purposes of these amounts in simple language: "
   insertStatement="
@@ -39,11 +39,11 @@ function extract-amts() {
     fi
   done
 
-  sqlite3 $DB "$insertStatement;"
+  sudo sqlite3 $DB "$insertStatement;"
   if [ $? -ne 0 ]; then
     echo -e "[extract-amts] Insert error:\n\n\t$insertStatement;\n"
     exit 1
   fi
-  total=$(sqlite3 $DB "select sum(amt) from amt where billId = '$billIdInDb' group by billId")
+  total=$(sudo sqlite3 $DB "select sum(amt) from amt where billId = '$billIdInDb' group by billId")
   printf "\t\e[1;36mtotal: \$%'21.2f\e[0m\n" $total
 }

@@ -4,14 +4,14 @@
 # Parameters: name, desc, nUpdates, nPages, fp, createdTime, updatedTime
 function extract-bill() {
   printf "\e[1;31m$(date)  \e[1;32m$billId\e[0m - $title\n"
-  local lastUpdateTm=$(sqlite3 "$DB" "select lastUpdateTm from bill where name='$billId'")
+  local lastUpdateTm=$(sudo sqlite3 "$DB" "select lastUpdateTm from bill where name='$billId'")
   if [ -z "$lastUpdateTm" ]; then
     lastUpdateTm=0
   fi
   if [ $lastUpdateTm -lt $updateSecondsSinceEpoch ]; then
     # sqlite3 apparently doesn't support merge statements, so we'll delete and insert instead.
     execStr="
-    sqlite3 '$DB' '
+    sudo sqlite3 '$DB' '
     DELETE FROM bill
       WHERE name = \"$billId\";
     INSERT INTO bill (
@@ -21,7 +21,9 @@ function extract-bill() {
       lastAction,
       lastActionDt,
       filepath,
-      congress)
+      congress,
+      chamber,
+      file_ext)
     VALUES (
       \"$(echo $billId | tr -d "'")\",
       \"$(echo $title | tr -d "'")\",
@@ -29,7 +31,9 @@ function extract-bill() {
       \"$(echo $latestAction | tr -d "'")\",
       $latestActionDt,
       \"$(echo $textFp | tr -d "'")\",
-      $congress
+      $congress,
+      ( select id from chamber where lower( abbrev ) = lower(\"$chamber\") )
+      \"${textFp##*.}\"
     );'"
     eval $execStr 
     if [ $? -ne 0 ]; then
