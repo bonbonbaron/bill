@@ -76,6 +76,13 @@ for f in $(ls $PKG_URL_DIR); do
   billSummaryFp="$PKG_URL_DIR/$f"
   billIdx=0
   nBills=$(jq '.pagination.count' $billSummaryFp | tr -d '"')
+  echo "nBills is $nBills"
+  # Sometimes the url package won't show any number of bills.
+  if [ -z "$nBills" -o $nBills = 'null' ]; then
+    echo "number of pages of bills is nonexistent"
+    jq '.' $billSummaryFp
+    continue;
+  fi
   # For each bill in the current batch...
   while [ $billIdx -lt $nBills ]; do
     # Bill (from bill endpoint)
@@ -90,11 +97,17 @@ for f in $(ls $PKG_URL_DIR); do
     nActions=$(echo $bill | jq '.actions.count' | tr -d '"')
     updateTimestamp=$(echo $bill | jq '.updateDateIncludingText' | tr -d '"')
     updateSecondsSinceEpoch=$(date -d $(echo $bill | jq '.updateDateIncludingText' | tr -d '"') +%s)
+    # If an update time with text is missing, then just tell the database that we're "updating" it now.
+    if [ -z "$updateSecondsSinceEpoch" ]; then
+      updateSecondsSinceEpoch=$(date -d 'now' +%s)
+    fi
+    updateSecondsSinceEpoch=$(date -d $(echo $bill | jq '.updateDateIncludingText' | tr -d '"') +%s)
     # Details (from details endpoint)
     details=$(curl $BE_QUIET -X 'GET' "$(echo $bill | jq '.url' | tr -d '"')&$KEY")
     sponsors=$(echo $details | jq '.bill.sponsors' 2>/dev/null)
     cosponsors=$(curl $BE_QUIET "$(echo $details | jq '.bill.cosponsors.url' | tr -d '"')&$KEY")
     # Text (from text endpoint)
+    # NOTE: Downloadable text may not exist yet for this bill.
     textUrl=
     textFp=
     availableTexts=$(curl $BE_QUIET -X 'GET' "https://api.congress.gov/v3/bill/$congress/$chamber/$billNumber/text?&$KEY")

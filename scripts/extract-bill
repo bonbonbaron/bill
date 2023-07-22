@@ -22,7 +22,7 @@ function extract-bill() {
       lastActionDt,
       filepath,
       congress,
-      chamber,
+      chamberId,
       file_ext)
     VALUES (
       \"$(echo $billId | tr -d "'")\",
@@ -32,7 +32,7 @@ function extract-bill() {
       $latestActionDt,
       \"$(echo $textFp | tr -d "'")\",
       $congress,
-      ( select id from chamber where lower( abbrev ) = lower(\"$chamber\") )
+      ( select id from chamber where lower( abbrev ) = lower(\"$chamber\") ),
       \"${textFp##*.}\"
     );'"
     eval $execStr 

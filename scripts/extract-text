@@ -2,6 +2,10 @@
 
 function extract-text() {
   nVersions=$(echo $availableTexts | jq '.textVersions|length')
+  # Return if there are no versions of texts to speak of.
+  if [ -z "$nVersions" ]; then
+    return;
+  fi
   versionIdx=0
   if [ $nVersions -gt 0 ]; then
     # To get the latest version, you have to find the latest date.
