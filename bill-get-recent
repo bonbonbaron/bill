@@ -61,12 +61,22 @@ function procBillPkg() {
 # Get this congress's first page of 100 bill summaries. (Time format in URL is yyyy-mm-dd'T'HH:mm:ss'Z'.)
 echo -e "\nRunning from $PRVDATETIME to $NEWDATETIME\n" | sed 's/%3A/:/g; s/[TZ]/ /g'
 todays_bill_activity=$(curl $BE_QUIET -X 'GET' "https://api.congress.gov/v3/bill/?fromDateTime=$PRVDATETIME&toDateTime=$NEWDATETIME&limit=250&offsetMark=0&congress=118&$KEY")
+# If you can't even get the first page of bill activity without rate limit errors, bomb out and try again later.
+if [ echo $todays_bill_activity | jq '.error.code' = 'OVER_RATE_LIMIT' ]; then
+	echo "Hit the rate limit. Exitting..."
+	exit 0;
+fi
 procBillPkg $todays_bill_activity
 # If there are anymore pages beyond the first, retrieve and store them in the databse as well.
 nextPage=$(echo "$todays_bill_activity" | jq '.nextPage' | sed 's/"//g')
 while [ ! ${nextPage} = null ]; do
   #echo "nextPage = ${nextPage}"
   todays_bill_activity=$(curl $BE_QUIET -X 'GET' "${nextPage}&$KEY")
+  # If you can't get the next page of bill activity without rate limit errors, bomb out and try again later.
+  if [ echo $todays_bill_activity | jq '.error.code' = 'OVER_RATE_LIMIT' ]; then
+  	echo "Hit the rate limit. Exitting..."
+  	exit 0;
+  fi
   procBillPkg $todays_bill_activity
   nextPage=$(echo $todays_bill_activity | jq '.nextPage' | sed 's/"//g')
 done
@@ -104,13 +114,31 @@ for f in $(ls $PKG_URL_DIR); do
     updateSecondsSinceEpoch=$(date -d $(echo $bill | jq '.updateDateIncludingText' | tr -d '"') +%s)
     # Details (from details endpoint)
     details=$(curl $BE_QUIET -X 'GET' "$(echo $bill | jq '.url' | tr -d '"')&$KEY")
+    # If you've hit the rate limit at this point, then you need to bomb out and come back again later.
+    if [ echo $details | jq '.error.code' = 'OVER_RATE_LIMIT' ]; then
+	echo "Hit the rate limit. Exitting..."
+	NEWDATETIME=$(echo $latestActionDt | date -u +%Y-%m-%dT%H%%3A%M%%3A%SZ)
+        break;
+    fi
     sponsors=$(echo $details | jq '.bill.sponsors' 2>/dev/null)
     cosponsors=$(curl $BE_QUIET "$(echo $details | jq '.bill.cosponsors.url' | tr -d '"')&$KEY")
+    # If you've hit the rate limit at this point, then you need to bomb out and come back again later.
+    if [ echo $cosponsors | jq '.error.code' = 'OVER_RATE_LIMIT' ]; then
+	echo "Hit the rate limit. Exitting..."
+	NEWDATETIME=$(echo $latestActionDt | date -u +%Y-%m-%dT%H%%3A%M%%3A%SZ)
+        break;
+    fi
     # Text (from text endpoint)
     # NOTE: Downloadable text may not exist yet for this bill.
     textUrl=
     textFp=
     availableTexts=$(curl $BE_QUIET -X 'GET' "https://api.congress.gov/v3/bill/$congress/$chamber/$billNumber/text?&$KEY")
+    # If you've hit the rate limit at this point, then you need to bomb out and come back again later.
+    if [ echo $availableTexts | jq '.error.code' = 'OVER_RATE_LIMIT' ]; then
+	echo "Hit the rate limit. Exitting..."
+	NEWDATETIME=$(echo $latestActionDt | date -u +%Y-%m-%dT%H%%3A%M%%3A%SZ)
+        break;
+    fi
     nAvailableTexts=$(echo $availableTexts | jq '.pagination.count' | tr -d '"')
     # Extract relevant data into database and files
     extract-text
